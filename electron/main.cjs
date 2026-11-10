@@ -5,6 +5,9 @@ const { pathToFileURL } = require('node:url');
 const { resolveAssetUrl } = require('./assets.cjs');
 protocol.registerSchemesAsPrivileged([{scheme:'riptide-assets',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 let hosted, window;
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
 app.setPath("userData", path.join(app.getPath("appData"), "Riptide Rush"));
 app.whenReady().then(() => {
   // Serve only bundled art through a fetch-capable scheme. Keep the existing file
@@ -30,11 +33,17 @@ app.whenReady().then(() => {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep simulating and rendering when the window is covered or unfocused
+      // (hosting an online race, split-screen on a second monitor).
+      backgroundThrottling: false,
     },
   });
   if (process.env.VITE_DEV_SERVER_URL)
     window.loadURL(process.env.VITE_DEV_SERVER_URL);
-  else window.loadFile(path.join(__dirname, "../dist/index.html"));
+  else
+    window.loadFile(path.join(__dirname, "../dist/index.html"), {
+      search: process.env.RR_QUERY || "",
+    });
 });
 ipcMain.handle("host", async (_, port) => {
   if (hosted) await hosted.close();
