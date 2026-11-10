@@ -208,10 +208,41 @@ export class Graphics {
     this.previewRenderer.render(this.previewScene,this.previewCamera);
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,480,220);ctx.drawImage(this.previewRenderer.domElement,0,0);
   }
+  // True when the GPU is integrated/software, so first launch should default to Low.
+  isWeakGpu() {
+    const gl = this.renderer.getContext(),
+      ext = gl.getExtension("WEBGL_debug_renderer_info"),
+      name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+    return /Intel|Microsoft Basic|SwiftShader|llvmpipe/i.test(name) && !/Arc/i.test(name);
+  }
+  // Dynamic resolution: drop render scale when frames run slow, creep back up when there is headroom.
+  autoTune(dt) {
+    this.dyn ??= 1;
+    this.tuneTime = (this.tuneTime || 0) + dt;
+    this.tuneFrames = (this.tuneFrames || 0) + 1;
+    if (this.tuneTime < 1) return;
+    const fps = this.tuneFrames / this.tuneTime;
+    this.tuneTime = this.tuneFrames = 0;
+    let next = this.dyn;
+    if (fps < 50) {
+      next = Math.max(0.4, this.dyn * Math.max(0.75, Math.sqrt(fps / 58)));
+      this.tuneGood = 0;
+    } else if (fps > 57 && this.dyn < 1) {
+      this.tuneGood = (this.tuneGood || 0) + 1;
+      if (this.tuneGood >= 5) {
+        next = Math.min(1, this.dyn * 1.08);
+        this.tuneGood = 0;
+      }
+    } else this.tuneGood = 0;
+    if (Math.abs(next - this.dyn) > 0.01) {
+      this.dyn = next;
+      this.resize();
+    }
+  }
   resize() {
     const q = [0.65, 0.85, 1, 1.25][this.settings.quality ?? 2];
     this.renderer.setPixelRatio(
-      Math.min(2, devicePixelRatio) * this.settings.scale * q,
+      Math.min(2, devicePixelRatio) * this.settings.scale * q * (this.dyn ?? 1),
     );
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setPixelRatio(this.renderer.getPixelRatio());

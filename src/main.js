@@ -53,6 +53,10 @@ const input = new Input((id) => {
 let graphics;
 try {
   graphics = new Graphics($("#game"), settings);
+  if (!localStorage.getItem("rr.settings") && graphics.isWeakGpu()) {
+    settings.quality = 0;
+    graphics.resize();
+  }
   graphics.load(track);
 } catch (e) {
   ui.innerHTML =
@@ -739,6 +743,8 @@ function frame(now) {
   const dt = Math.min(0.08, (now - last) / 1000);
   last = now;
   input.poll();
+  if (screen === "race") graphics.autoTune((now - (frame.prev ?? now)) / 1000);
+  frame.prev = now;
   if (screen !== "race") input.menu(dt);
   if (
     (screen === "setup" && mode === "Local Multiplayer") ||
