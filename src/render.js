@@ -126,22 +126,44 @@ export class Graphics {
   // Dynamic resolution: drop render scale when frames run slow, creep back up when there is headroom.
   autoTune(dt) {
     this.dyn ??= 1;
+    // Hitches (asset loading, shader compiles, tab switches) say nothing about steady-state speed.
+    if (dt > 0.1) {
+      this.tuneTime = this.tuneFrames = this.tuneBad = 0;
+      return;
+    }
     this.tuneTime = (this.tuneTime || 0) + dt;
     this.tuneFrames = (this.tuneFrames || 0) + 1;
     if (this.tuneTime < 1) return;
     const fps = this.tuneFrames / this.tuneTime;
     this.tuneTime = this.tuneFrames = 0;
+    this.tuneCapAge = (this.tuneCapAge || 0) + 1;
+    if (this.tuneCapAge > 30) this.tuneCap = 1; // retry full resolution every so often
     let next = this.dyn;
     if (fps < 50) {
-      next = Math.max(0.4, this.dyn * Math.max(0.75, Math.sqrt(fps / 58)));
       this.tuneGood = 0;
-    } else if (fps > 57 && this.dyn < 1) {
-      this.tuneGood = (this.tuneGood || 0) + 1;
-      if (this.tuneGood >= 5) {
-        next = Math.min(1, this.dyn * 1.08);
-        this.tuneGood = 0;
+      this.tuneBad = (this.tuneBad || 0) + 1;
+      if (this.tuneBad >= 2) {
+        // A scale we just stepped up to that fails becomes the ceiling for a while.
+        if (this.tuneRaised) {
+          this.tuneCap = this.dyn / 1.12;
+          this.tuneCapAge = 0;
+        }
+        next = Math.max(0.5, this.dyn * Math.max(0.8, Math.sqrt(fps / 58)));
+        this.tuneBad = 0;
+        this.tuneRaised = false;
       }
-    } else this.tuneGood = 0;
+    } else if (fps > 57 && this.dyn < (this.tuneCap ?? 1)) {
+      this.tuneBad = 0;
+      this.tuneGood = (this.tuneGood || 0) + 1;
+      if (this.tuneGood >= 2) {
+        next = Math.min(this.tuneCap ?? 1, this.dyn * 1.12);
+        this.tuneGood = 0;
+        this.tuneRaised = true;
+      }
+    } else {
+      this.tuneGood = this.tuneBad = 0;
+      this.tuneRaised = false;
+    }
     if (Math.abs(next - this.dyn) > 0.01) {
       this.dyn = next;
       this.resize();
