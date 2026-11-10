@@ -143,6 +143,11 @@ function setup(nextMode) {
   config.ai = mode === "Time Trial" ? 0 : 7;
   showSetup();
 }
+function trackPreview() {
+ const t=makeTrack(config.track),xs=t.samples.map(p=>p.x),zs=t.samples.map(p=>p.z);
+ const minX=Math.min(...xs)-50,minZ=Math.min(...zs)-50,w=Math.max(...xs)-minX+50,h=Math.max(...zs)-minZ+50;
+ return `<div id="track-preview" class="track-preview"><svg viewBox="${minX} ${minZ} ${w} ${h}" aria-label="Track minimap"><polyline points="${t.samples.map(p=>p.x+','+p.z).join(' ')}" fill="none" stroke="#52c8d6" stroke-width="${t.width}" stroke-linejoin="round"/><circle cx="${t.samples[0].x}" cy="${t.samples[0].z}" r="18" fill="#ffd66b"/></svg><span>${(t.length/1000).toFixed(2)} KM / BEST ${clock(records[config.track])}</span></div>`;
+}
 function trackControls() {
   return `<div class="row"><label>Waterway<select id="track">${TRACKS.map((t, i) => `<option value="${i}" ${config.track === i ? "selected" : ""}>${t.name}</option>`).join("")}</select></label><label>Laps<select id="laps">${[1, 2, 3, 4, 5, 7, 9].map((n) => `<option ${config.laps === n ? "selected" : ""}>${n}</option>`).join("")}</select></label><label>AI boats<select id="ai">${Array.from({ length: 8 }, (_, i) => `<option ${config.ai === i ? "selected" : ""}>${i}</option>`).join("")}</select></label><label>Difficulty<select id="difficulty">${["Cruise", "Racer", "Expert"].map((n, i) => `<option value="${i}" ${config.difficulty === i ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>`;
 }
@@ -153,6 +158,7 @@ function wireTrack() {
       if (k === "track") {
         track = makeTrack(config.track);
         graphics.load(track);
+        const preview=$("#track-preview");if(preview)preview.outerHTML=trackPreview();
       }
       if (online?.isHost) online.ws.send(encode("config", { config }));
     });
@@ -163,7 +169,7 @@ function boatCards(player = 0) {
 function showSetup() {
   page(
     mode,
-    `${mode === "Championship" ? '<p class="subtitle">Three waterways. One title. Points: 15 / 12 / 10 / 8 / 6 / 4 / 2 / 1.</p>' : ""}${trackControls()}<div class="card"><div class="row"><h3>Your machine</h3><label>Skipper name<input id="name" type="text" maxlength="24" value="${escapeHtml(choices[0].name)}"></label><label>Hull colour<input id="color" type="color" value="${choices[0].color}"></label></div>${boatCards()}<p class="muted">Choose your hull. Each boat has its own speed, acceleration, turning and boost balance.</p></div>${mode === "Local Multiplayer" ? '<div class="card"><h3>Press any button to join</h3><div id="joined"></div><p class="muted">W / Space joins WASD · Up / Right Ctrl joins arrows · any controller button joins a pad. Up to four players. Each slot can choose a boat and colour.</p><div class="row">' + button("clear", "Clear players") + button("keyboard", "Add second keyboard") + "</div></div>" : ""}<div class="row">${button("start", "Launch Race", true)}${button("back", "Back", false, true)}</div>`,
+    `${trackPreview()}${mode === "Championship" ? '<p class="subtitle">Three waterways. One title. Points: 15 / 12 / 10 / 8 / 6 / 4 / 2 / 1.</p>' : ""}${trackControls()}<div class="card"><div class="row"><h3>Your machine</h3><label>Skipper name<input id="name" type="text" maxlength="24" value="${escapeHtml(choices[0].name)}"></label><label>Hull colour<input id="color" type="color" value="${choices[0].color}"></label></div><canvas id="boat-preview" width="480" height="220" aria-label="Rotating boat preview"></canvas>${boatCards()}<p class="muted">Choose your hull. Each boat has its own speed, acceleration, turning and boost balance.</p></div>${mode === "Local Multiplayer" ? '<div class="card"><h3>Press any button to join</h3><div id="joined"></div><p class="muted">W / Space joins WASD · Up / Right Ctrl joins arrows · any controller button joins a pad. Up to four players. Each slot can choose a boat and colour.</p><div class="row">' + button("clear", "Clear players") + button("keyboard", "Add second keyboard") + "</div></div>" : ""}<div class="row">${button("start", "Launch Race", true)}${button("back", "Back", false, true)}</div>`,
     true,
   );
   wireTrack();
@@ -311,16 +317,18 @@ function updateHud() {
       : b.finished
         ? "FINISHED · " + clock(b.finishTime)
         : "";
-    el.querySelector(".countdown").textContent =
-      time < 0 ? Math.ceil(-time) : time < 0.8 ? "GO" : "";
+    el.classList.toggle("boost-active",!!b.boosting);
+    if(b.previousPosition && b.position<b.previousPosition) {b.callout="UP TO P"+b.position;b.calloutUntil=time+2;}
+    b.previousPosition=b.position;
+    el.querySelector(".countdown").innerHTML = time<0 ? `<div class="lights">${[3,2,1].map(n=>`<i class="${-time<=n?'lit':''}"></i>`).join('')}</div>${Math.ceil(-time)}` : time<.8 ? "GO!" : b.calloutUntil>time?b.callout : b.lap===config.laps-1 && time-b.lapStart<3 ? "FINAL LAP" : "";
     el.querySelector(".best").textContent = records[config.track]
       ? " · BEST " + clock(records[config.track])
       : "";
     const ctx = el.querySelector(".mini").getContext("2d");
     ctx.clearRect(0, 0, 180, 180);
-    const xy = (p) => [90 + p.x * 0.28, 90 + p.z * 0.28];
+    const xy = (p) => [90 + p.x * 0.15, 90 + p.z * 0.15];
     ctx.strokeStyle = "#7bbfcd88";
-    ctx.lineWidth = track.width * 0.28;
+    ctx.lineWidth = track.width * 0.15;
     ctx.beginPath();
     track.samples.forEach((p, i) => {
       const [x, y] = xy(p);
@@ -396,7 +404,7 @@ function finish() {
     championship
       ? `Championship / Round ${championship.round + 1}`
       : "Across the line",
-    `<div class="card"><table><thead><tr><th>POS</th><th>SKIPPER / HULL</th><th>FINISH</th><th>BEST LAP</th>${championship ? "<th>POINTS</th>" : ""}</tr></thead><tbody>${ordered.map((b) => `<tr><td>${b.position || "—"}</td><td style="color:${b.color}">${escapeHtml(b.name)}<br><small>${BOATS[b.type].name}</small></td><td>${b.finished ? clock(b.finishTime) : "Racing"}</td><td>${clock(b.bestLap)}</td>${championship ? `<td>${championship.points[b.id]}</td>` : ""}</tr>`).join("")}</tbody></table></div>${championship && championship.round === 2 ? `<p class="subtitle">Champion: ${escapeHtml(boats.find((b) => b.id === Object.keys(championship.points).sort((a, b) => championship.points[b] - championship.points[a])[0])?.name || "Skipper")}</p>` : ""}<div class="row">${!online ? button("again", championship && championship.round < 2 ? "Next waterway" : "Race Again", true) : ""}${button("home", "Main Menu", false, true)}</div>`,
+    `<div class="card"><table><thead><tr><th>POS</th><th>SKIPPER / HULL</th><th>FINISH</th><th>BEST LAP</th>${championship ? "<th>POINTS</th>" : ""}</tr></thead><tbody>${ordered.map((b) => `<tr><td>${b.position || "—"}</td><td style="color:${b.color}">${escapeHtml(b.name)}<br><small>${BOATS[b.type].name}</small></td><td>${b.finished ? clock(b.finishTime) : "Racing"}</td><td>${clock(b.bestLap)}<br><small>${(b.lapTimes||[]).map((t,i)=>`L${i+1} ${clock(t)}`).join(" / ")}</small></td>${championship ? `<td>${championship.points[b.id]}</td>` : ""}</tr>`).join("")}</tbody></table></div>${championship && championship.round === 2 ? `<p class="subtitle">Champion: ${escapeHtml(boats.find((b) => b.id === Object.keys(championship.points).sort((a, b) => championship.points[b] - championship.points[a])[0])?.name || "Skipper")}</p>` : ""}<div class="row">${!online ? button("again", championship && championship.round < 2 ? "Next waterway" : "Race Again", true) : ""}${button("home", "Main Menu", false, true)}</div>`,
     true,
   );
   on("again", () => {
@@ -708,7 +716,7 @@ function simulate(dt) {
     const inputs = boats.map((b, i) =>
       b.local
         ? input.read(input.joined[locals.indexOf(b)])
-        : aiInput(b, track, config.difficulty, leader),
+        : aiInput(b, track, config.difficulty, leader, boats),
     );
     stepWorld(boats, track, dt, time, config.laps, inputs);
   }
@@ -777,15 +785,20 @@ function frame(now) {
       }
       graphics.update(boats, Math.max(0, time), dt);
       updateHud();
-      if (locals.length && locals.every((b) => b.finished)) finish();
+      if (locals.length && locals.every((b) => b.finished) && time-Math.max(...locals.map(b=>b.finishTime))>4) finish();
     }
-    graphics.render(locals, dt);
+    graphics.render(locals, dt, false, time);
     audio.update(locals, track.theme, !paused);
   } else {
+    if(screen==="setup" && $("#boat-preview")) graphics.preview($("#boat-preview"),choices[0].type,choices[0].color,now/1000);
     graphics.update(boats.length ? boats : [], now / 1000, dt);
     graphics.render([], dt, true, now / 1000);
     audio.update([], track.theme, false);
   }
 }
-home();
+
+// Reproducible browser verification uses the same race and physics paths.
+const params=new URLSearchParams(location.search);
+if(params.has("verify")){config.track=Number(params.get("track")||0);config.ai=7;input.joined=[input.devices[0]];startRace();boats.forEach(b=>b.local=false);window.rrVerify={boats,track,graphics};}
+else home();
 requestAnimationFrame(frame);

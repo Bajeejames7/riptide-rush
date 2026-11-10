@@ -1,4 +1,4 @@
-import { WAVES } from "./core/physics.js";
+import { WAVES, WAVE_STEEPNESS } from "./core/physics.js";
 
 // The coefficients and phase calculation are shared with the CPU buoyancy sampler.
 export const waterVertex = `
@@ -9,17 +9,23 @@ void main() {
   vec3 p = position;
   float h = 0.0;
   vec2 grad = vec2(0.0);
+  vec3 jacobian=vec3(1.,0.,1.);
   ${WAVES.map(
     ([a, k, x, z, s]) => `{
     vec2 direction=vec2(${x.toFixed(3)},${z.toFixed(3)});
     float phase=${k.toFixed(4)}*dot(position.xz,direction)-time*${s.toFixed(3)};
     h+=${a.toFixed(3)}*sin(phase);
     grad+=${(a * k).toFixed(6)}*direction*cos(phase);
-    p.xz+=${(a * 0.35).toFixed(4)}*direction*cos(phase);
+    p.xz+=${(a * WAVE_STEEPNESS).toFixed(6)}*direction*cos(phase);
+    float j=-${(a*k*WAVE_STEEPNESS).toFixed(6)}*sin(phase);
+    jacobian+=j*vec3(direction.x*direction.x,direction.x*direction.y,direction.y*direction.y);
+
   }`,
   ).join("\n")}
   p.y = h;
   world = p;
+  float determinant=jacobian.x*jacobian.z-jacobian.y*jacobian.y;
+  grad=vec2(grad.x*jacobian.z-grad.y*jacobian.y,grad.y*jacobian.x-grad.x*jacobian.y)/determinant;
   norm = normalize(vec3(-grad.x,1.0,-grad.y));
   gl_Position=projectionMatrix*viewMatrix*vec4(p,1.0);
 }`;
@@ -27,22 +33,39 @@ void main() {
 export const waterFragment = `
 uniform float time;
 uniform vec3 baseColor,skyColor,sunDir;
-uniform vec4 wakes[8];
+uniform vec4 wakes[64];
+uniform samplerCube environmentMap;
 uniform vec4 blockers[2];
-uniform vec2 shore[80];
+uniform vec3 shore[128];
 uniform float width;
+uniform vec4 shortcuts[2];
 varying vec3 world,norm;
 void main() {
-  vec3 n=normalize(norm+vec3(sin(world.z*.7+time)*.025,0.0,cos(world.x*.8-time)*.025));
+  vec2 uv=world.xz;
+  float detail=sin(uv.x*1.17+sin(uv.y*.73+time*.6))*sin(uv.y*1.31-time*.8);
+  vec3 n=normalize(norm+vec3(detail*.045,0.0,sin(uv.y*1.7+sin(uv.x*.91)-time)*.045));
   vec3 v=normalize(cameraPosition-world);
   float fres=.035+.965*pow(1.0-max(dot(n,v),0.0),5.0);
   float bank=10000.0;
-  for(int i=0;i<80;i++) bank=min(bank,distance(world.xz,shore[i]));
-  float shallow=smoothstep(width*.25,width*.58,bank);
+  float localWidth=width;
+  for(int i=0;i<128;i++) {
+    vec3 a=shore[i],b=shore[(i+1)-((i+1)/128)*128];
+    vec2 ab=b.xy-a.xy;
+    float t=clamp(dot(world.xz-a.xy,ab)/max(dot(ab,ab),.01),0.,1.);
+    float dist=distance(world.xz,a.xy+t*ab);
+    if(dist<bank){bank=dist;localWidth=mix(a.z,b.z,t);}
+  }
+  for(int i=0;i<2;i++){
+    vec2 a=shortcuts[i].xy,ab=shortcuts[i].zw-a;
+    float t=clamp(dot(world.xz-a,ab)/max(dot(ab,ab),.01),0.,1.);
+    float d=distance(world.xz,a+t*ab);
+    if(d<bank){bank=d;localWidth=22.;}
+  }
+  float shallow=smoothstep(localWidth*.22,localWidth*.53,bank);
   float depth=mix(15.0,1.2,shallow);
   vec3 transmitted=mix(baseColor*1.8,baseColor*.55,1.0-exp(-depth*.13));
   vec3 reflected=reflect(-v,n);
-  vec3 reflectedSky=mix(skyColor*1.1,skyColor*.5,clamp(reflected.y,0.0,1.0));
+  vec3 reflectedSky=mix(textureCube(environmentMap,reflected).rgb,skyColor*.3,.15);
   vec3 col=mix(transmitted,reflectedSky,fres*.85+.1);
   float spec=pow(max(dot(reflect(-sunDir,n),v),0.0),180.0);
   col+=vec3(1.0,.85,.65)*spec*2.0;
@@ -52,14 +75,15 @@ void main() {
     float edge=abs(distance(world.xz,blockers[i].xy)-blockers[i].z);
     foam+=exp(-edge*1.4)*(.6+.4*sin(time*3.0+world.x));
   }
-  for(int i=0;i<8;i++) {
+  for(int i=0;i<64;i++) {
     vec2 d=world.xz-wakes[i].xy;
     float along=dot(d,vec2(sin(wakes[i].z),cos(wakes[i].z)));
     float side=abs(dot(d,vec2(cos(wakes[i].z),-sin(wakes[i].z))));
     float wake=exp(-abs(side+along*.25)*1.2)*(1.0-smoothstep(-4.0,0.0,along))*smoothstep(-24.0,-2.0,along)*wakes[i].w;
-    foam+=wake;
+    foam+=wake*(i<8?1.:.09);
+    foam+=exp(-side*side*.6)*smoothstep(-15.,-3.,along)*(1.-smoothstep(-3.,0.,along))*wakes[i].w*(i<8?.45:.03);
   }
-  col=mix(col,vec3(.8,.97,1.0),clamp(foam*.7,0.0,.85));
+  col=mix(col,vec3(.65,.87,.94),clamp(foam*.7,0.0,.85));
   gl_FragColor=vec4(col,1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

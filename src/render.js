@@ -1,9 +1,11 @@
 import * as T from "three";
-import { Sky } from "three/addons/objects/Sky.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { addEnvironment, loftHull, softTexture } from "./scenery.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { nearest } from "./core/tracks.js";
 import { BOATS } from "./core/physics.js";
 import { waterVertex, waterFragment } from "./water.js";
 const tmp = new T.Vector3();
@@ -24,7 +26,7 @@ function box(parent, mat, x, y, z, w, h, d) {
 export function buildBoat(type, color) {
   const g = new T.Group(),
     spec = BOATS[type],
-    paint = material(color, 0.65, 0.23),
+    paint = new T.MeshPhysicalMaterial({color,metalness:.45,roughness:.24,clearcoat:1,clearcoatRoughness:.12}),
     dark = material(0x111c2a, 0.7, 0.25),
     white = material(0xe4eff2, 0.4, 0.25),
     glass = new T.MeshPhysicalMaterial({
@@ -36,23 +38,11 @@ export function buildBoat(type, color) {
   const widths = [1.75, 2.25, 2, 1.4, 2.1, 1.8],
     w = widths[type],
     len = [7.5, 7, 8.5, 8, 8.2, 7.2][type];
-  const hull = new T.Shape();
-  hull.moveTo(0, len * 0.56);
-  hull.lineTo(w * 0.65, len * 0.18);
-  hull.lineTo(w, -len * 0.38);
-  hull.quadraticCurveTo(0, -len * 0.55, -w, -len * 0.38);
-  hull.lineTo(-w * 0.65, len * 0.18);
-  hull.closePath();
-  const geom = new T.ExtrudeGeometry(hull, {
-    depth: 0.7,
-    bevelEnabled: true,
-    bevelThickness: 0.2,
-    bevelSize: 0.2,
-    bevelSegments: 2,
-    steps: 1,
-  });
-  geom.rotateX(Math.PI / 2);
-  mesh(geom, paint, g, 0, 0.2, 0);
+  const profiles=[{w:w,l:len},{w:w*.47,l:len},{w:w*.45,l:len*.86},{w:w*.82,l:len*.8},{w:w*1.12,l:len},{w:w*.48,l:len}];
+  const profile=profiles[type];
+  const hulls=type===1?[-w*.7,w*.7]:type===5?[-w,0,w]:[0];
+  for(const x of hulls) mesh(loftHull(profile.w,profile.l,type),paint,g,x,0,0);
+  if(type===2) for(const side of [-1,1]) mesh(loftHull(.6,len*.65,2),paint,g,side*w,0,len*.15);
   box(g, dark, 0, -0.4, -0.3, w * 1.5, 0.3, len * 0.63);
   const cockpit = mesh(new T.SphereGeometry(1, 16, 10), glass, g, 0, 0.6, -0.2);
   cockpit.scale.set(w * 0.55, 0.65, len * 0.22);
@@ -122,10 +112,21 @@ export function buildBoat(type, color) {
     new T.MeshBasicMaterial({ map: decal, side: T.DoubleSide }),
     g,
     0,
-    0.39,
+    0.66,
     len * 0.21,
   );
-  plate.rotation.x = -Math.PI / 2;
+  plate.rotation.x = -Math.PI / 2 + .09;
+  for(const side of [-1,1]) {
+    box(g,dark,side*w*.45,.65,-len*.22,.5,.5,1.4);
+    for(let j=0;j<4;j++) box(g,white,side*w*.45,.93,-len*.28+j*.27,.55,.08,.12);
+    box(g,white,side*w*.7,-.25,-len*.5,.7,.08,.7);
+    const flame=mesh(new T.ConeGeometry(.4,2.8,12),new T.MeshBasicMaterial({color:new T.Color(.15,1.6,5),transparent:true,opacity:.65}),g,side*w*.62,.1,-len*.64);
+    flame.rotation.x=-Math.PI/2;flame.name="flame";flame.visible=false;
+    const vertices=[],indices=[];
+    for(let j=0;j<=16;j++) {const t=.52+j/16*.4,z=(t-.5)*len;for(const edge of [-1,1])vertices.push(side*w*.22+edge*.09,.395+t*t*.48,z);}
+    for(let j=0;j<16;j++){const a=j*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}
+    const stripe=new T.BufferGeometry();stripe.setAttribute("position",new T.Float32BufferAttribute(vertices,3));stripe.setIndex(indices);stripe.computeVertexNormals();mesh(stripe,white,g);
+  }
   return g;
 }
 export class Graphics {
@@ -137,7 +138,7 @@ export class Graphics {
     });
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 0.85;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFSoftShadowMap;
     this.scene = new T.Scene();
@@ -162,30 +163,50 @@ export class Graphics {
     this.particleMesh = new T.Points(
       this.particleGeo,
       new T.PointsMaterial({
-        size: 0.7,
+        map: softTexture(),
+        size: 1.8,
         vertexColors: true,
         transparent: true,
         opacity: 0.65,
         depthWrite: false,
-        blending: T.AdditiveBlending,
+        blending: T.NormalBlending,
       }),
     );
     this.particleMesh.frustumCulled = false;
     this.composer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.scene, this.cameras[0]);
     this.composer.addPass(this.renderPass);
-    this.bloom = new UnrealBloomPass(new T.Vector2(100, 100), 0.4, 0.6, 0.8);
+    this.bloom = new UnrealBloomPass(new T.Vector2(100, 100), 0.22, 0.35, 1.6);
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass({
-      uniforms: { tDiffuse: { value: null } },
+      uniforms: { tDiffuse: { value: null },boost:{value:0},time:{value:0} },
       vertexShader:
         "varying vec2 uv0;void main(){uv0=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
       fragmentShader:
-        "uniform sampler2D tDiffuse;varying vec2 uv0;void main(){vec4 c=texture2D(tDiffuse,uv0);float v=smoothstep(.8,.2,distance(uv0,vec2(.5)));gl_FragColor=vec4(c.rgb*(.75+.25*v),c.a);}",
+        `uniform sampler2D tDiffuse;uniform float boost,time;varying vec2 uv0;
+        void main(){vec2 uv=uv0;
+        float heat=exp(-pow((uv.x-.5)*9.,2.)-pow((uv.y-.2)*9.,2.));
+        uv.x+=sin(uv.y*140.+time*33.)*heat*boost*.003;
+        vec4 c=texture2D(tDiffuse,uv);
+        for(int i=1;i<5;i++)c+=texture2D(tDiffuse,mix(uv,vec2(.5),float(i)*.004*boost));
+        c*=.2;float v=1.-smoothstep(.2,.8,distance(uv0,vec2(.5)));
+        gl_FragColor=vec4(c.rgb*(.82+.18*v),c.a);}`,
     });
     this.composer.addPass(this.vignette);
+    this.composer.addPass(new OutputPass());
+    this.composer.renderToScreen=false;
+    this.blitScene=new T.Scene();this.blitCamera=new T.OrthographicCamera(-1,1,1,-1,0,1);
+    this.blitMaterial=new T.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{tDiffuse:{value:null}},vertexShader:"varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}",fragmentShader:"uniform sampler2D tDiffuse;varying vec2 v;void main(){gl_FragColor=texture2D(tDiffuse,v);}"});
+    this.blitScene.add(new T.Mesh(new T.PlaneGeometry(2,2),this.blitMaterial));
     this.resize();
     window.addEventListener("resize", () => this.resize());
+  }
+  preview(canvas,type,color,time) {
+    if(!this.previewRenderer){this.previewRenderer=new T.WebGLRenderer({alpha:true,antialias:true});this.previewRenderer.setSize(480,220);this.previewRenderer.toneMapping=T.ACESFilmicToneMapping;this.previewScene=new T.Scene();this.previewScene.add(new T.HemisphereLight(0xc9eaff,0x1c263c,2));const l=new T.DirectionalLight(0xffffff,3);l.position.set(5,8,8);this.previewScene.add(l);this.previewCamera=new T.PerspectiveCamera(36,480/220,.1,100);this.previewCamera.position.set(10,6,13);this.previewCamera.lookAt(0,0,0);}
+    if(this.previewKey!==type+color){if(this.previewBoat)this.previewScene.remove(this.previewBoat);this.previewBoat?.traverse(o=>{o.geometry?.dispose();if(o.material){for(const v of Object.values(o.material))if(v?.isTexture)v.dispose();o.material.dispose();}});this.previewBoat=buildBoat(type,color);this.previewScene.add(this.previewBoat);this.previewKey=type+color;}
+    this.previewScene.environment=this.scene.environment;this.previewBoat.rotation.y=time*.4;
+    this.previewRenderer.render(this.previewScene,this.previewCamera);
+    const ctx=canvas.getContext("2d");ctx.clearRect(0,0,480,220);ctx.drawImage(this.previewRenderer.domElement,0,0);
   }
   resize() {
     const q = [0.65, 0.85, 1, 1.25][this.settings.quality ?? 2];
@@ -216,22 +237,20 @@ export class Graphics {
     }
     this.boatModels.clear();
     this.pickupModels = [];
-    this.particles = [];
+    this.splashes=[];this.shake=0;
+    this.particles = [];this.wakeHistory=[];this.wakeClock=0;
     const theme = track.theme;
     this.scene.background = new T.Color(track.sky);
-    this.scene.fog = new T.FogExp2(
-      track.sky,
-      theme === "city" ? 0.0019 : 0.0012,
-    );
+    this.scene.fog = new T.Fog(track.sky, 420, 1800);
     const hemi = new T.HemisphereLight(
       theme === "tropic" ? 0xccefff : 0x7f9bff,
       0x163a3b,
-      theme === "tropic" ? 2 : 1.2,
+      theme === "tropic" ? 1.3 : 1.5,
     );
     this.scene.add(hemi);
     const sun = new T.DirectionalLight(
       theme === "tropic" ? 0xfff2d4 : 0xc99bff,
-      theme === "tropic" ? 3 : 1.6,
+      theme === "tropic" ? 2.1 : 1.8,
     );
     sun.position.set(120, 220, -150);
     sun.castShadow = true;
@@ -243,19 +262,25 @@ export class Graphics {
     sun.shadow.camera.far = 700;
     sun.shadow.normalBias = 0.05;
     this.scene.add(sun);
-    if (theme !== "city") {
-      const sky = new Sky();
-      sky.scale.setScalar(1600);
-      const u = sky.material.uniforms;
-      u.turbidity.value = theme === "ice" ? 7 : 2;
-      u.rayleigh.value = theme === "ice" ? 3 : 1;
-      u.mieCoefficient.value = 0.005;
-      u.mieDirectionalG.value = 0.8;
-      u.sunPosition.value.set(120, theme === "ice" ? 12 : 200, -150);
-      this.scene.add(sky);
-    }
+    this.scene.add(sun.target);this.sun=sun;
+    // A bounded radiance sky keeps the horizon blue even before tone mapping.
+    const sky=new T.Mesh(new T.SphereGeometry(1900,32,16),new T.ShaderMaterial({
+      side:T.BackSide,depthWrite:false,uniforms:{top:{value:new T.Color(theme==="tropic"?0x176ac0:theme==="ice"?0x172d61:0x030718)},bottom:{value:new T.Color(track.sky)}},
+      vertexShader:"varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+      fragmentShader:"uniform vec3 top,bottom;varying vec3 p;void main(){float h=clamp(normalize(p).y,0.,1.);gl_FragColor=vec4(mix(bottom,top,sqrt(h)),1.);}"}));
+    this.scene.add(sky);
+    const disc=mesh(new T.SphereGeometry(theme==="tropic"?20:13,24,16),new T.MeshBasicMaterial({color:new T.Color(theme==="tropic"?0xffdf9b:0xabcfff).multiplyScalar(3)}),this.scene,700,theme==="tropic"?600:300,-1000);
+    const glare=new T.Sprite(new T.SpriteMaterial({map:softTexture(),color:theme==="tropic"?0xffc46d:0x81aaff,transparent:true,opacity:.3,blending:T.AdditiveBlending,depthWrite:false}));
+    glare.position.copy(disc.position);glare.scale.set(140,140,1);this.scene.add(glare);
+    const envScene=new T.Scene();envScene.add(sky.clone());envScene.add(disc.clone());
+    this.reflectionTarget?.dispose();this.reflectionTarget=new T.WebGLCubeRenderTarget(128,{type:T.HalfFloatType});
+    new T.CubeCamera(.5,2100,this.reflectionTarget).update(this.renderer,envScene);
+    const pmrem=new T.PMREMGenerator(this.renderer);
+    this.environment?.dispose();this.environment=pmrem.fromCubemap(this.reflectionTarget.texture);
+    this.scene.environment=this.environment.texture;pmrem.dispose();
     this.waterUniforms = {
       time: { value: 0 },
+      environmentMap:{value:this.reflectionTarget.texture},
       baseColor: { value: new T.Color(track.water) },
       skyColor: {
         value: new T.Color(
@@ -265,30 +290,29 @@ export class Graphics {
       sunDir: { value: sun.position.clone().normalize() },
       wakes: {
         value: Array.from(
-          { length: 8 },
+          { length: 64 },
           () => new T.Vector4(10000, 10000, 0, 0),
         ),
       },
       shore: {
-        value: track.samples
-          .filter((_, i) => i % 8 === 0)
-          .map((p) => new T.Vector2(p.x, p.z)),
+        value: Array.from({length:128},(_,i)=>track.samples[Math.floor(i*track.samples.length/128)]).map(p=>new T.Vector3(p.x,p.z,p.width)),
       },
       width: { value: track.width },
       blockers: {
         value: track.obstacles.map((o) => new T.Vector4(o.x, o.z, o.radius, 0)),
       },
     };
+    this.waterUniforms.shortcuts={value:track.shortcuts.map(({a,b})=>new T.Vector4(a.x,a.z,b.x,b.z))};
     const waterMat = new T.ShaderMaterial({
       uniforms: this.waterUniforms,
       vertexShader: waterVertex,
       fragmentShader: waterFragment,
     });
     const waterGeo = new T.PlaneGeometry(
-      1800,
-      1800,
-      [64, 100, 180, 260][this.settings.quality],
-      [64, 100, 180, 260][this.settings.quality],
+      2600,
+      2600,
+      [160, 240, 420, 560][this.settings.quality],
+      [160, 240, 420, 560][this.settings.quality],
     );
     waterGeo.rotateX(-Math.PI / 2);
     this.water = mesh(waterGeo, waterMat, this.scene);
@@ -310,106 +334,10 @@ export class Graphics {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
     };
-    for (let i = 0; i < track.samples.length; i += 8) {
-      const p = track.samples[i],
-        side = i % 16 === 0 ? 1 : -1,
-        h = p.heading;
-      for (const s of [-1, 1]) {
-        const x = p.x + Math.cos(h) * s * (track.width * 0.5 + 9),
-          z = p.z - Math.sin(h) * s * (track.width * 0.5 + 9);
-        const r = mesh(
-          new T.IcosahedronGeometry(
-            theme === "city" ? 6 : 11,
-            theme === "tropic" ? 1 : 0,
-          ),
-          sand,
-          this.scene,
-          x,
-          -3,
-          z,
-        );
-        r.scale.set(1, theme === "ice" ? 2.5 : 0.7, 1);
-        if (theme === "city") {
-          const height = 15 + rand() * 95;
-          const b = box(
-            this.scene,
-            material(
-              new T.Color().setHSL(0.6, 0.25, 0.08 + rand() * 0.08),
-              0.5,
-              0.45,
-            ),
-            x + s * 12,
-            height / 2,
-            z,
-            10 + rand() * 14,
-            height,
-            10 + rand() * 12,
-          );
-          for (let y = 5; y < height; y += 8) {
-            box(
-              b,
-              new T.MeshStandardMaterial({
-                color: i % 3 ? 0x33f3ed : 0xff3da9,
-                emissive: i % 3 ? 0x11c7cf : 0xf91e8f,
-                emissiveIntensity: 2,
-              }),
-              0,
-              y - height / 2,
-              -(b.geometry.parameters.depth / 2 + 0.02),
-              b.geometry.parameters.width * 0.8,
-              0.7,
-              0.1,
-            );
-          }
-        } else if (theme === "tropic" && i % 24 === 0) {
-          const trunk = mesh(
-            new T.CylinderGeometry(0.45, 0.7, 12, 7),
-            material(0x896448, 0.05, 0.9),
-            this.scene,
-            x,
-            5,
-            z,
-          );
-          trunk.rotation.z = s * 0.16;
-          for (let a = 0; a < 6; a++) {
-            const leaf = mesh(
-              new T.ConeGeometry(2, 8, 4),
-              green,
-              this.scene,
-              x + Math.sin(a) * 3,
-              11,
-              z + Math.cos(a) * 3,
-            );
-            leaf.rotation.set(Math.cos(a) * 1.1, 0, Math.sin(a) * 1.1);
-          }
-        } else if (theme === "ice" && i % 24 === 0) {
-          const crystal = mesh(
-            new T.ConeGeometry(4, 18 + rand() * 15, 5),
-            rock,
-            this.scene,
-            x,
-            5,
-            z,
-          );
-          crystal.rotation.z = s * 0.2;
-        }
-      }
-      if (i % 32 === 0) {
-        for (const s of [-1, 1]) {
-          const buoy = mesh(
-            new T.CylinderGeometry(0.6, 1.1, 2, 8),
-            i % 80 === 0 ? neon : material(0xff783e),
-            this.scene,
-            p.x + Math.cos(h) * s * (track.width * 0.5 - 2),
-            0.7,
-            p.z - Math.sin(h) * s * (track.width * 0.5 - 2),
-          );
-        }
-      }
-    }
+    addEnvironment(this.scene,track);
     track.ramps.forEach((r) => {
       const group = new T.Group();
-      group.position.set(r.x, 0.8, r.z);
+      group.position.set(r.x, r.height/2, r.z);
       group.rotation.y = r.heading;
       this.scene.add(group);
       const deck = box(
@@ -420,9 +348,10 @@ export class Graphics {
         0,
         11,
         0.55,
-        12,
+        Math.hypot(r.length,r.height),
       );
-      deck.rotation.x = -0.22;
+      deck.rotation.x = -Math.atan2(r.height,r.length);
+      for(const side of [-1,1]) for(const z of [-6,6]) box(group,darkMaterial(),side*4,-r.height/2,z,.5,r.height,.5);
       for (const s of [-1, 1]) box(group, neon, s * 5.6, 0.8, 0, 0.15, 0.2, 12);
       for (let i = -2; i < 3; i++)
         box(group, whiteMaterial(), 0, 0.6, i * 2, 6, 0.08, 0.25);
@@ -469,13 +398,16 @@ export class Graphics {
       new T.PlaneGeometry(track.width, 4.5),
       new T.MeshBasicMaterial({
         map: new T.CanvasTexture(banner),
-        side: T.DoubleSide,
+        side: T.FrontSide,
+        toneMapped: false,
       }),
       arch,
       0,
       13,
       0,
     );
+    sign.rotation.y=Math.PI;
+    const reverse=sign.clone();reverse.rotation.y=0;reverse.position.z=.05;arch.add(reverse);
     track.pickups.forEach((p, i) => {
       const g = new T.Group();
       g.position.set(p.x, 2, p.z);
@@ -531,6 +463,13 @@ export class Graphics {
         new T.Points(geo, new T.PointsMaterial({ color: 0xa1c7ff, size: 1.4 })),
       );
     }
+    // Capture the built environment as well as the sky, including city windows.
+    this.water.visible=false;
+    const reflectionCamera=new T.CubeCamera(.5,2100,this.reflectionTarget);
+    reflectionCamera.position.set(start.x,5,start.z);reflectionCamera.update(this.renderer,this.scene);
+    this.water.visible=true;
+    const finalPmrem=new T.PMREMGenerator(this.renderer);this.environment.dispose();
+    this.environment=finalPmrem.fromCubemap(this.reflectionTarget.texture);this.scene.environment=this.environment.texture;finalPmrem.dispose();
     this.scene.add(this.particleMesh);
     this.cameras.forEach((c) => c.position.set(start.x, 14, start.z - 25));
   }
@@ -543,14 +482,19 @@ export class Graphics {
         y: b.y,
         vx: -b.vx * 0.13 + s * 4,
         vz: -b.vz * 0.13 + (Math.random() - 0.5) * 6,
-        vy: landing ? 6 + Math.random() * 7 : 2 + Math.random() * 5,
+        vy: landing ? 6 + Math.random() * 7 : 2 + Math.random() * Math.abs(b.speed)*.22,
         life: 0.4 + Math.random() * 0.5,
-        color: new T.Color(b.boosting ? 0xffa433 : 0xabeaff),
+        color: new T.Color(0xabeaff),
       });
     }
   }
   update(boats, time, dt) {
     this.waterUniforms.time.value = time;
+    this.wakeClock+=dt;
+    if(this.wakeClock>.15){this.wakeClock=0;for(const b of boats)if(Math.abs(b.speed)>8)this.wakeHistory.unshift({x:b.x,z:b.z,heading:b.heading,life:1});}
+    this.wakeHistory=this.wakeHistory.filter(p=>(p.life-=dt*.18)>0).slice(0,56);
+    for(let i=8;i<64;i++){const p=this.wakeHistory[i-8];this.waterUniforms.wakes.value[i].set(p?.x??10000,p?.z??10000,p?.heading||0,p?.life||0);}
+    this.scene.traverse(o=>{if(o.userData.traffic)o.position.x=((time*9+o.id*7)%40)-20;if(o.userData.hologram){o.material.opacity=.22+Math.sin(time*5)*.06;o.position.y=29+Math.sin(time)*.4;}});
     boats.forEach((b, i) => {
       let model = this.boatModels.get(b.id);
       if (!model) {
@@ -558,6 +502,7 @@ export class Graphics {
         this.boatModels.set(b.id, model);
         this.scene.add(model);
       }
+      model.traverse(o=>{if(o.name==="flame"){o.visible=b.boosting;o.scale.y=.8+Math.random()*.5;}});
       model.position.set(b.x, b.y, b.z);
       model.rotation.set(b.pitch || 0, b.heading, b.roll || 0, "YXZ");
       if (i < 8)
@@ -569,7 +514,17 @@ export class Graphics {
         );
       if (Math.abs(b.speed) > 8 && Math.random() < 0.8)
         this.spray(b, b.boosting ? 5 : 2);
-      if (b.events?.includes("land")) this.spray(b, 35, true);
+      if ((b.landSerial||0)!==(model.userData.landSerial||0)) {
+        model.userData.landSerial=b.landSerial;
+        this.spray(b, 55, true);this.shake=.7;
+        const ring=mesh(new T.RingGeometry(1,1.5,40),new T.MeshBasicMaterial({color:0xc5f1ff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
+        ring.rotation.x=-Math.PI/2;this.splashes.push({mesh:ring,life:1});
+      }
+      if(b.local&&b.boosting)this.shake=Math.max(this.shake,.12);
+      if(Math.abs(b.speed)>20 && Math.random()<.6) {
+        const side=Math.random()<.5?-1:1;
+        this.particles.push({x:b.x+Math.sin(b.heading)*2+Math.cos(b.heading)*side*1.5,z:b.z+Math.cos(b.heading)*2-Math.sin(b.heading)*side*1.5,y:b.y,vx:b.vx*.3+Math.cos(b.heading)*side*(b.drifting?12:5),vz:b.vz*.3-Math.sin(b.heading)*side*5,vy:2+Math.random()*3,life:.6,color:new T.Color(0xbce4ee)});
+      }
     });
     for (const [id, model] of this.boatModels)
       if (!boats.some((b) => b.id === id)) {
@@ -593,6 +548,8 @@ export class Graphics {
         });
       }
     });
+    this.shake=Math.max(0,this.shake-dt*1.8);
+    this.splashes=this.splashes.filter(s=>{s.life-=dt;const scale=1+(1-s.life)*13;s.mesh.scale.setScalar(scale);s.mesh.material.opacity=s.life*.6;if(s.life<=0){this.scene.remove(s.mesh);s.mesh.geometry.dispose();s.mesh.material.dispose();return false;}return true;});
     this.particles = this.particles.filter((p) => p.life > 0);
     this.particles.forEach((p, i) => {
       p.life -= dt;
@@ -634,21 +591,25 @@ export class Graphics {
         y = (1 - Math.floor(i / 2)) * h;
       }
       c.aspect = w / h;
-      const fov = b?.boosting ? 79 : 65;
+      const fov = 64 + Math.min(15,Math.abs(b?.speed||0)*.2) + (b?.boosting?12:0);
       c.fov += (fov - c.fov) * Math.min(1, dt * 5);
       c.updateProjectionMatrix();
       if (b) {
-        const distance = 14 + Math.abs(b.speed) * 0.06;
+        const distance = b.cameraView ? -2 : 14 + Math.abs(b.speed) * 0.10;
         tmp.set(
           b.x - Math.sin(b.heading) * distance,
-          b.y + 7 + Math.abs(b.speed) * 0.025,
+          b.y + (b.cameraView?1.6:6 + Math.abs(b.speed) * 0.025),
           b.z - Math.cos(b.heading) * distance,
         );
-        c.position.lerp(tmp, 1 - Math.exp(-dt * 6));
+        c.position.lerp(tmp, 1 - Math.exp(-dt * 4.5));
+        c.position.x+=Math.sin(time*61)*this.shake*.2;c.position.y+=Math.sin(time*73)*this.shake*.3;
+        c.up.set(Math.sin((b.roll||0)*.2),1,0);
+        const ahead=this.track.samples[(nearest(this.track,b.x,b.z).index+10)%this.track.samples.length];
+        const lookHeading=b.heading+(ahead?Math.atan2(Math.sin(ahead.heading-b.heading),Math.cos(ahead.heading-b.heading))*.3:0);
         c.lookAt(
-          b.x + Math.sin(b.heading) * 12,
+          b.x + Math.sin(lookHeading) * 25,
           b.y + 1,
-          b.z + Math.cos(b.heading) * 12,
+          b.z + Math.cos(lookHeading) * 25,
         );
       } else {
         c.position.set(
@@ -658,15 +619,19 @@ export class Graphics {
         );
         c.lookAt(0, 0, 0);
       }
-      if (n === 1 && this.settings.quality >= 2) {
-        this.renderPass.camera = c;
-        this.composer.render();
-      } else {
-        r.setViewport(x, y, w, h);
-        r.setScissor(x, y, w, h);
-        r.setScissorTest(true);
-        r.render(this.scene, c);
+      if(b?.finished) {c.position.set(b.x+Math.sin(time*.4+1)*18,b.y+6,b.z+Math.cos(time*.4+1)*18);c.lookAt(b.x,b.y,b.z);}
+      if(b) {
+        this.sun.target.position.set(b.x,0,b.z);this.sun.position.set(b.x+120,220,b.z-150);
+        Object.assign(this.sun.shadow.camera,{left:-65,right:65,top:65,bottom:-65});this.sun.shadow.camera.updateProjectionMatrix();
       }
+      r.setScissorTest(false);
+      if(this.postWidth!==w||this.postHeight!==h){this.composer.setSize(w,h);this.postWidth=w;this.postHeight=h;}
+      this.vignette.uniforms.boost.value=b?.boosting?1:0;this.vignette.uniforms.time.value=time;
+      this.renderPass.camera=c;
+      this.composer.render();
+      r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);
+      this.blitMaterial.uniforms.tDiffuse.value=this.composer.readBuffer.texture;
+      r.autoClear=false;r.render(this.blitScene,this.blitCamera);r.autoClear=true;
     }
     r.setScissorTest(false);
   }

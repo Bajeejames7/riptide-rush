@@ -8,6 +8,7 @@ export const ACTIONS = [
   "drift",
   "reset",
   "pause",
+  "camera",
 ];
 export class Input {
   constructor(onDrop) {
@@ -88,6 +89,7 @@ export class Input {
               "Slash",
               "Backspace",
               "Escape",
+              "Numpad0",
             ]
           : [
               "KeyW",
@@ -99,6 +101,7 @@ export class Input {
               "KeyC",
               "KeyR",
               "Escape",
+              "KeyV",
             ];
       return Object.fromEntries(
         ACTIONS.map((a, i) => [a, { kind: "key", code: keys[i] }]),
@@ -114,6 +117,7 @@ export class Input {
       drift: { kind: "button", index: 4 },
       reset: { kind: "button", index: 3 },
       pause: { kind: "button", index: 9 },
+      camera: { kind: "button", index: 2 },
     };
   }
   value(device, binding) {

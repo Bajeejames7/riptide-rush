@@ -29,7 +29,7 @@ test("all tracks: eight boat simulation, ordered checkpoints, complete laps, fin
       boats.every((b) => b.finished && b.lap >= 3),
       `AI must finish ${track.name}`,
     );
-    assert.ok(boats.every((b) => b.checkpoint >= 0 && b.checkpoint < 8));
+    assert.ok(boats.every((b) => b.checkpoint >= 0 && b.checkpoint < track.checkpointCount));
     assert.ok(Number.isFinite(wave(12, 25, 30).height));
   }
 });

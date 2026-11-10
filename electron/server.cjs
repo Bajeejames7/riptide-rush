@@ -195,6 +195,7 @@ async function hostGame(port = 27015) {
             track,
             config.difficulty,
             Math.max(...boats.map((x) => x.progress)),
+            boats,
           ),
         ),
       );

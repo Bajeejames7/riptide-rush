@@ -18,7 +18,7 @@
     "ws": "latest"
   },
   "devDependencies": {
-    "electron": "latest",
+    "electron": "45.2.1",
     "electron-builder": "latest",
     "vite": "latest"
   },

@@ -11,18 +11,28 @@ export const WAVES = [
   [0.55, 0.045, 1, 0.4, 1.25],
   [0.28, 0.085, -0.6, 1, 1.7],
   [0.15, 0.16, 0.8, -0.5, 2.1],
+  [0.09, 0.27, -0.92, -0.38, 2.6],
+  [0.045, 0.43, 0.31, 0.95, 3.1],
+  [0.025, 0.67, -0.72, 0.69, 3.8],
 ];
-export function wave(x, z, t) {
-  let h = 0,
-    nx = 0,
-    nz = 0;
-  for (const [a, k, dx, dz, s] of WAVES) {
-    const q = k * (dx * x + dz * z) - s * t;
-    h += a * Math.sin(q);
-    nx += a * k * dx * Math.cos(q);
-    nz += a * k * dz * Math.cos(q);
-  }
-  return { height: h, nx, nz };
+export const WAVE_STEEPNESS = 0.25;
+// Invert the horizontal Gerstner displacement so buoyancy samples world space,
+// exactly where the GPU places the surface, rather than undisplaced grid space.
+export function wave(x,z,t) {
+ let u=x,v=z;
+ for(let iteration=0;iteration<5;iteration++) {
+  let dx=0,dz=0;
+  for(const [a,k,sx,sz,speed] of WAVES){const q=k*(sx*u+sz*v)-speed*t;dx+=WAVE_STEEPNESS*a*sx*Math.cos(q);dz+=WAVE_STEEPNESS*a*sz*Math.cos(q);}
+  u=x-dx;v=z-dz;
+ }
+ let h=0,hx=0,hz=0,jxx=1,jxz=0,jzz=1;
+ for(const [a,k,dx,dz,s] of WAVES){
+  const q=k*(dx*u+dz*v)-s*t,cos=Math.cos(q),sin=Math.sin(q);
+  h+=a*sin;hx+=a*k*dx*cos;hz+=a*k*dz*cos;
+  const d=-WAVE_STEEPNESS*a*k*sin;jxx+=d*dx*dx;jxz+=d*dx*dz;jzz+=d*dz*dz;
+ }
+ const determinant=jxx*jzz-jxz*jxz;
+ return {height:h,nx:(hx*jzz-hz*jxz)/determinant,nz:(hz*jxx-hx*jxz)/determinant};
 }
 export const angle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export function createBoat(track, i = 0, type = i % 6) {
@@ -72,7 +82,7 @@ export function createBoat(track, i = 0, type = i % 6) {
 }
 export function resetBoat(b, track) {
   const p =
-    track.samples[Math.min(track.samples.length - 1, b.checkpoint * 80)];
+    track.samples[Math.min(track.samples.length - 1, b.checkpoint * track.samplesPerSector)];
   Object.assign(b, {
     x: p.x,
     z: p.z,
@@ -88,6 +98,8 @@ export function resetBoat(b, track) {
 }
 export function stepBoat(b, input, track, dt, time, laps = 3) {
   b.events = [];
+  if(input.camera && !b.cameraLatch)b.cameraView=!b.cameraView;
+  b.cameraLatch=!!input.camera;
   if (b.finished) input = { throttle: 0.2 };
   const spec = BOATS[b.type],
     n = nearest(track, b.x, b.z),
@@ -115,7 +127,7 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
     (throttle - brake * 0.36) * spec.speed * (b.boosting ? spec.boost : 1);
   b.speed +=
     (target - b.speed) *
-    Math.min(1, dt * (throttle || brake ? spec.accel / spec.speed : 1.0));
+    Math.min(1, dt * (throttle || brake ? spec.accel / spec.speed * (1-[.03,.01,.08,0,.1,.02][b.type]) : [1.1,.85,1.25,.95,1.4,.8][b.type]));
   b.heading +=
     steer *
     spec.handling *
@@ -123,6 +135,7 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
     Math.min(1, Math.abs(b.speed) / 15) *
     (b.speed < 0 ? -1 : 1) *
     (b.air ? 0.45 : 1);
+  b.drifting=!!input.drift;
   const grip = 1 - Math.exp(-dt * (input.drift ? 2.1 : 5.5));
   b.vx += (Math.sin(b.heading) * b.speed - b.vx) * grip;
   b.vz += (Math.cos(b.heading) * b.speed - b.vz) * grip;
@@ -130,33 +143,45 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
   b.z += b.vz * dt;
   b.vy -= 24 * dt;
   b.y += b.vy * dt;
-  const floor = w.height + 0.75;
+  let floor = wave(b.x,b.z,time).height + 0.75;
+  let rampLaunch=0;
+  for (const r of track.ramps) {
+    const dx=b.x-r.x,dz=b.z-r.z;
+    const along=dx*Math.sin(r.heading)+dz*Math.cos(r.heading);
+    const side=dx*Math.cos(r.heading)-dz*Math.sin(r.heading);
+    if(Math.abs(side)<r.width/2 && along>=-r.length/2 && along<=r.length/2) {
+      floor=Math.max(floor,0.75+(along/r.length+0.5)*r.height);
+      if(!b.air && b.speed>25 && along>r.length/2-2) {
+        rampLaunch=b.speed*r.height/r.length+5;
+      }
+    }
+  }
   if (b.y < floor) {
     if (b.air) {
+      if(b.vy < -8)b.speed*=.94;
+      b.landSerial=(b.landSerial||0)+1;
       b.events.push("land");
       b.air = false;
     }
     b.y = floor;
     b.vy = 0;
   }
+  if(rampLaunch){b.vy=rampLaunch;b.air=true;b.events.push("ramp");}
   b.pitch = b.air
     ? -Math.atan2(b.vy, Math.max(15, b.speed))
-    : -w.nz * Math.cos(b.heading) - w.nx * Math.sin(b.heading);
+    : -w.nz * Math.cos(b.heading) - w.nx * Math.sin(b.heading) - Math.min(.13,b.speed*.0015) + Math.sin(time*6+b.type)*b.speed*.00035;
   b.roll = -steer * b.speed * 0.003 + w.nx * 0.7;
-  for (const r of track.ramps)
-    if (Math.hypot(b.x - r.x, b.z - r.z) < 6 && !b.air && b.speed > 25) {
-      b.vy = 13 + b.speed * 0.045;
-      b.air = true;
-      b.events.push("ramp");
-    }
-  if (n.distance > track.width * 0.5 && !onShortcut(track, b.x, b.z)) {
+  if (n.distance > n.point.width * 0.5 && !onShortcut(track, b.x, b.z)) {
     const dx = b.x - n.point.x,
       dz = b.z - n.point.z,
       len = Math.hypot(dx, dz);
-    b.x = n.point.x + (dx / len) * track.width * 0.5;
-    b.z = n.point.z + (dz / len) * track.width * 0.5;
-    b.vx -= (dx / len) * 18;
-    b.vz -= (dz / len) * 18;
+    b.x = n.point.x + (dx / len) * n.point.width * 0.5;
+    b.z = n.point.z + (dz / len) * n.point.width * 0.5;
+    const outward = Math.max(0,(b.vx*dx+b.vz*dz)/len);
+    b.vx -= (dx / len) * outward*1.25;
+    b.vz -= (dz / len) * outward*1.25;
+    b.heading += angle(n.point.heading-b.heading)*0.12;
+    b.events.push("scrape");
     b.speed *= 0.96;
     if (n.distance > 90) resetBoat(b, track);
   }
@@ -177,8 +202,8 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
       p.cooldown = 7;
       b.events.push("pickup");
     }
-  const cp = Math.floor(n.index / 80);
-  if (cp === (b.checkpoint + 1) % 8) {
+  const cp = Math.floor(n.index / track.samplesPerSector);
+  if (cp === (b.checkpoint + 1) % track.checkpointCount) {
     if (cp === 0) {
       const lt = time - b.lapStart;
       b.lapTimes.push(lt);
