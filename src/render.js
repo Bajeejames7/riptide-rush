@@ -1,3 +1,4 @@
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as T from "three";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { addEnvironment } from "./scenery.js";
@@ -26,15 +27,28 @@ function box(parent, mat, x, y, z, w, h, d) {
 }
 export function buildBoat(type,color,number=type+1) {
  const g=new T.Group();g.name='boat';g.userData.keep=true;
- const hull=model('boat'+type);const bounds=new T.Box3().setFromObject(hull),size=bounds.getSize(new T.Vector3()),center=bounds.getCenter(new T.Vector3());
- const scale=8/Math.max(size.x,size.z);hull.position.sub(center);const shell=new T.Group();shell.add(hull);shell.scale.setScalar(scale);shell.rotation.y=0;g.add(shell);
- hull.traverse(o=>{if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;o.material=o.material.clone();o.material.userData.shared=false;o.material.metalness=.35;o.material.roughness=.3;o.material.envMapIntensity=1.15; o.material.onBeforeCompile=shader=>{shader.uniforms.racePaint={value:new T.Color(color)};shader.fragmentShader='uniform vec3 racePaint;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\nfloat chroma=max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b))-min(diffuseColor.r,min(diffuseColor.g,diffuseColor.b));\ndiffuseColor.rgb=mix(diffuseColor.rgb,racePaint*max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)),smoothstep(.12,.3,chroma));');};o.material.customProgramCacheKey=()=> 'race-paint-v1';});
- const c=document.createElement('canvas');c.width=128;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,128,64);ctx.fillStyle='white';ctx.font='bold italic 50px sans-serif';ctx.textAlign='center';ctx.fillText(String(number).padStart(2,'0'),64,50);const decal=new T.CanvasTexture(c);decal.colorSpace=T.SRGBColorSpace;
- shell.updateMatrixWorld(true);const ray=new T.Raycaster(new T.Vector3(0,8,1.7),new T.Vector3(0,-1,0)),hit=ray.intersectObject(shell,true)[0];
- const plate=mesh(new T.PlaneGeometry(1.4,.7),new T.MeshBasicMaterial({map:decal,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}),g,0,hit?hit.point.y+.025:.8,1.7);plate.rotation.x=-Math.PI/2;
- if(hit){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),normal);}
-
- for(const side of [-1,1]){const flame=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0x77ccff,blending:T.AdditiveBlending,transparent:true,depthWrite:false}));flame.position.set(side*.85,.1,-4);flame.scale.set(1.2,3,1);flame.name='flame';flame.visible=false;g.add(flame);}
+ const hull=model('boat'+type),bounds=new T.Box3().setFromObject(hull),size=bounds.getSize(new T.Vector3()),center=bounds.getCenter(new T.Vector3());
+ hull.position.sub(center);const shell=new T.Group();shell.add(hull);shell.scale.set( [2.8,3.5,3.2,2.3,4.1,3.7][type]/size.x,1.3/size.y,[8.6,7.8,9.2,10,8.8,7.4][type]/size.z);g.add(shell);
+ const paint=new T.MeshPhysicalMaterial({color,metalness:.42,roughness:.19,clearcoat:1,clearcoatRoughness:.12,envMapIntensity:1.4});
+ const trim=new T.MeshStandardMaterial({color:0x142331,metalness:.7,roughness:.21});
+ hull.traverse(o=>{if(o.isMesh){o.material=paint;o.castShadow=o.receiveShadow=true;}});
+ // Added racing hardware is batched into the two hull materials, keeping Low submissions bounded.
+ for(const side of [-1,1]){
+  if(type===1||type===4)box(g,paint,side*1.7,-.15,.1,.65,.7,8);
+  box(g,trim,side*.72,.15,-3.8,.65,.9,type===2?1.8:1.1); // engine blocks
+  const exhaust=mesh(new T.CylinderGeometry(.17,.21,1.1,6),trim,g,side*.72,.2,-4.4);exhaust.rotation.x=Math.PI/2;
+  box(g,trim,side*.8,.8,-1,.42,.4,.9); // intakes
+  box(g,trim,side*1.05,.9,-2.7,.12,1,.35);
+ }
+ if(type!==3)box(g,paint,0,1.4,-2.7,type===4?4.5:3,.15,.65);
+ const windshield=box(g,trim,0,.9,.2,type===3?1.1:1.8,.7,1);windshield.rotation.x=-.5;
+ if(type===2)box(g,trim,0,.85,-1.3,1.7,.65,2.2);
+ if(type===5)box(g,paint,0,.6,2.1,1.3,.35,3.5);
+ const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,512,256);ctx.fillStyle='#102332';ctx.fillRect(0,0,155,256);ctx.fillStyle='#ffffff';ctx.fillRect(162,0,20,256);ctx.font='italic 900 150px sans-serif';ctx.textAlign='center';ctx.fillText(String(number).padStart(2,'0'),340,165);ctx.font='bold 29px sans-serif';ctx.fillText(['TIDELINE','WAKEWORKS','DEEP ARC','SURGE CO','BLUE SHIFT','SEA VECTOR'][type],320,220);const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;
+ const deck=mesh(new T.PlaneGeometry(type===3?1.4:2.3,3.5),new T.MeshPhysicalMaterial({map:tex,metalness:.35,roughness:.2,clearcoat:1,side:T.DoubleSide}),g,0,.72,1.8);deck.rotation.x=-Math.PI/2;
+ g.updateMatrixWorld(true);
+ for(const mat of [paint,trim]){const parts=[];g.traverse(o=>{if(o.isMesh&&o.material===mat)parts.push(o);});const geometries=parts.map(o=>{let geo=o.geometry.clone().applyMatrix4(o.matrixWorld);if(geo.index)geo=geo.toNonIndexed();for(const k of Object.keys(geo.attributes))if(!['position','normal','uv'].includes(k))geo.deleteAttribute(k);return geo;});const geo=mergeGeometries(geometries);geometries.forEach(v=>v.dispose());parts.forEach(o=>{o.removeFromParent();if(!o.geometry.userData.shared)o.geometry.dispose();});mesh(geo,mat,g);}
+ const flame=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0x77ccff,blending:T.AdditiveBlending,transparent:true,depthWrite:false,toneMapped:false}));flame.position.set(0,.2,-4.7);flame.scale.set(2.4,2,1);flame.name='flame';flame.visible=false;g.add(flame);
  return g;
 }
 export class Graphics {
@@ -77,7 +91,8 @@ export class Graphics {
         transparent: true,
         opacity: 0.65,
         depthWrite: false,
-        blending: T.NormalBlending,
+        blending: T.AdditiveBlending,
+        toneMapped: false,
       }),
     );
     this.particleMesh.frustumCulled = false;
@@ -229,11 +244,15 @@ export class Graphics {
     const hdri=assets.skies.get(theme);this.scene.background=hdri;
     this.scene.backgroundIntensity=theme==='city'?.55:.85;
     const lighting=skyLighting(hdri);this.scene.fog=new T.Fog(lighting.horizon.multiplyScalar(this.scene.backgroundIntensity),330,1450);
+    this.renderer.toneMappingExposure=track.variant==='sunset'?.7:track.variant==='rain'?.65:.85;
+    if(track.variant==='sunset'){sun.color.set(0xffa766);this.scene.backgroundIntensity=.6;this.scene.fog.color.set(0xcb997e);}
+    if(track.variant==='fog'){this.scene.fog.near=80;this.scene.fog.far=550;this.scene.backgroundIntensity=.55;}
+    if(track.variant==='rain'){this.scene.fog.near=100;this.scene.fog.far=650;sun.intensity*=.5;}
     this.sunOffset=lighting.direction.multiplyScalar(260);sun.position.copy(this.sunOffset);
     this.reflectionTarget?.dispose();this.reflectionTarget=new T.WebGLCubeRenderTarget(128,{type:T.HalfFloatType});
     const skyScene=new T.Scene();skyScene.background=hdri;new T.CubeCamera(.5,2100,this.reflectionTarget).update(this.renderer,skyScene);
     this.environments??=new Map();if(!this.environments.has(theme)){const pmrem=new T.PMREMGenerator(this.renderer);this.environments.set(theme,pmrem.fromEquirectangular(hdri));pmrem.dispose();}this.environment=this.environments.get(theme);this.scene.environment=this.environment.texture;
-    this.particleMesh.material.map=assets.textures.get('spray');this.particleMesh.material.needsUpdate=true;
+    if(!this.sprayMask){const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),gradient=ctx.createRadialGradient(32,32,0,32,32,32);gradient.addColorStop(0,'rgba(255,255,255,1)');gradient.addColorStop(.3,'rgba(255,255,255,.8)');gradient.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64);this.sprayMask=new T.CanvasTexture(c);this.sprayMask.userData.shared=true;}this.particleMesh.material.map=this.sprayMask;this.particleMesh.material.needsUpdate=true;
     this.waterUniforms = {
       time: { value: 0 },
       shoreMap:{value:assets.textures.get('shore_'+theme)},
@@ -416,7 +435,7 @@ export class Graphics {
         vz: -b.vz * 0.13 + (Math.random() - 0.5) * 6,
         vy: landing ? 6 + Math.random() * 7 : 2 + Math.random() * Math.abs(b.speed)*.22,
         life: 0.4 + Math.random() * 0.5,
-        color: new T.Color(0xabeaff),
+        color: new T.Color(0xffffff),
       });
     }
   }
@@ -436,6 +455,7 @@ export class Graphics {
         this.scene.add(model);
       }
       model.traverse(o=>{if(o.name==="flame"){o.visible=b.boosting;o.scale.y=.8+Math.random()*.5;}});
+      model.visible=!b.eliminated;
       model.position.set(b.x, b.y, b.z);
       model.rotation.set(b.pitch || 0, b.heading, b.roll || 0, "YXZ");
       if (i < 8)
@@ -450,13 +470,13 @@ export class Graphics {
       if ((b.landSerial||0)!==(model.userData.landSerial||0)) {
         model.userData.landSerial=b.landSerial;
         this.spray(b, 55, true);this.shake=.7;
-        const ring=mesh(new T.PlaneGeometry(4,4),new T.MeshBasicMaterial({map:assets.textures.get("foam"),color:0xc5f1ff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
+        const ring=mesh(new T.PlaneGeometry(4,4),new T.MeshBasicMaterial({map:this.sprayMask,blending:T.AdditiveBlending,toneMapped:false,color:0xffffff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
         ring.rotation.x=-Math.PI/2;this.splashes.push({mesh:ring,life:1});
       }
       if(b.local&&b.boosting)this.shake=Math.max(this.shake,.12);
       if(Math.abs(b.speed)>20 && Math.random()<.6) {
         const side=Math.random()<.5?-1:1;
-        this.particles.push({x:b.x+Math.sin(b.heading)*2+Math.cos(b.heading)*side*1.5,z:b.z+Math.cos(b.heading)*2-Math.sin(b.heading)*side*1.5,y:b.y,vx:b.vx*.3+Math.cos(b.heading)*side*(b.drifting?12:5),vz:b.vz*.3-Math.sin(b.heading)*side*5,vy:2+Math.random()*3,life:.6,color:new T.Color(0xbce4ee)});
+        this.particles.push({x:b.x+Math.sin(b.heading)*2+Math.cos(b.heading)*side*1.5,z:b.z+Math.cos(b.heading)*2-Math.sin(b.heading)*side*1.5,y:b.y,vx:b.vx*.3+Math.cos(b.heading)*side*(b.drifting?12:5),vz:b.vz*.3-Math.sin(b.heading)*side*5,vy:2+Math.random()*3,life:.6,color:new T.Color(0xffffff)});
       }
     });
     for (const [id, model] of this.boatModels)

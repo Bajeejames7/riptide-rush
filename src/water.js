@@ -45,9 +45,9 @@ uniform vec4 shortcuts[2];
 varying vec3 world,norm;
 void main() {
   vec2 uv=world.xz;
-  vec3 detail=texture2D(detailMap,uv*.055+vec2(time*.008,time*.013)).xyz*2.-1.;
-  vec3 fine=texture2D(detailMap,uv*.093-vec2(time*.012,time*.006)).xyz*2.-1.;
-  vec3 n=normalize(norm+vec3(detail.x+fine.x,0.,detail.y+fine.y)*.16);
+  vec3 detail=texture2D(detailMap,uv*.023+vec2(time*.008,time*.013)).xyz*2.-1.;
+  vec3 fine=texture2D(detailMap,mat2(.74,-.67,.67,.74)*uv*.037-vec2(time*.012,time*.006)).xyz*2.-1.;
+  vec3 n=normalize(norm+vec3(detail.x+fine.x,0.,detail.y+fine.y)*.065);
   vec3 v=normalize(cameraPosition-world);
   float fres=.035+.965*pow(1.0-max(dot(n,v),0.0),5.0);
   float shoreDistance=texture2D(shoreMap,world.xz/2600.+.5).r*64.-32.;
@@ -71,10 +71,10 @@ void main() {
     float along=dot(d,vec2(sin(wakes[i].z),cos(wakes[i].z)));
     float side=abs(dot(d,vec2(cos(wakes[i].z),-sin(wakes[i].z))));
     float wake=exp(-abs(side+along*.25)*1.2)*(1.0-smoothstep(-4.0,0.0,along))*smoothstep(-24.0,-2.0,along)*wakes[i].w;
-    foam+=wake*noise*(i<8?1.:.09);
+    foam+=wake*(.65+noise*.35)*(i<8?1.8:.12);
     foam+=exp(-side*side*.6)*smoothstep(-15.,-3.,along)*(1.-smoothstep(-3.,0.,along))*wakes[i].w*(i<8?.45:.03);
   }
-  col=mix(col,vec3(.65,.87,.94),clamp(foam*.7,0.0,.85));
+  col=mix(col,vec3(.95,.98,1.),clamp(foam*.7,0.0,.85));
   gl_FragColor=vec4(col,1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

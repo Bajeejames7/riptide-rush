@@ -225,7 +225,7 @@ export class Input {
     if (this.menuCooldown > 0) return;
     const els = [
       ...document.querySelectorAll(
-        "#ui button:not(:disabled),#ui select,#ui input",
+        "#ui button:not(:disabled),#ui select:not(:disabled),#ui input:not(:disabled)",
       ),
     ];
     if (!els.length) return;
@@ -237,14 +237,10 @@ export class Input {
       this.menuCooldown = 0.2;
     } else if (left || right) {
       if (focused?.tagName === "SELECT") {
-        focused.selectedIndex = Math.max(
-          0,
-          Math.min(
-            focused.options.length - 1,
-            focused.selectedIndex + (left ? -1 : 1),
-          ),
-        );
-        focused.dispatchEvent(new Event("change"));
+        const direction=left?-1:1;
+        let next=focused.selectedIndex+direction;
+        while(next>=0&&next<focused.options.length&&focused.options[next].disabled)next+=direction;
+        if(next>=0&&next<focused.options.length){focused.selectedIndex=next;focused.dispatchEvent(new Event("change"));}
       } else if (focused?.type === "range") {
         focused.value =
           +focused.value + (left ? -1 : 1) * Number(focused.step || 1);

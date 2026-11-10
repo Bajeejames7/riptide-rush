@@ -16,20 +16,21 @@ function terrainGeometry(pos,indices,columns){
 export function addEnvironment(scene,track){
  const theme=track.theme,ice=theme==='ice',city=theme==='city';
  const bank=surface(ice?'snow':city?'concrete':'sand'),rock=surface(ice?'snow':'rock'),dark=surface('metal');
+ if(!ice&&!city)bank.color.set(0xffd395);
  const glow=new T.MeshStandardMaterial({color:0x48b7c9,emissive:0x167d94,emissiveIntensity:1.8});
  // Closed spline strips share vertices at every sample: no gaps between bank pieces.
  for(const side of [-1,1]){
   const pos=[],indices=[],cliffIndices=[];
   for(let i=0;i<=track.samples.length;i++){
    const p=track.samples[i%track.samples.length],nx=Math.cos(p.heading)*side,nz=-Math.sin(p.heading)*side;
-   const height=ice?17+10*Math.sin(i*.026)**2:city?5:4+12*Math.sin(i*.03)**8;
-   for(const [offset,y] of [[0,-2],[2,ice?height*.7:1],[12,height],[35,height+3]]){
+   const height=ice?17+10*Math.sin(i*.026)**2:city?5:2+5*Math.sin(i*.03)**4;
+   for(const [offset,y] of [[0,-2],[5,ice?height*.7:.7],[24,height],[44,height+3]]){
     const d=p.width/2+offset;pos.push(p.x+nx*d,y,p.z+nz*d);
    }
   }
   for(let i=0;i<track.samples.length;i++)for(let j=0;j<3;j++){const a=i*4+j;
    const vx=pos[a*3],vz=pos[a*3+2];
-   if(!onShortcut(track,vx,vz)){const target=!ice&&!city&&j>0?cliffIndices:indices;target.push(a,a+4,a+1,a+1,a+4,a+5);}}
+   if(!onShortcut(track,vx,vz)){const target=!ice&&!city&&j>1?cliffIndices:indices;target.push(a,a+4,a+1,a+1,a+4,a+5);}}
   const g=terrainGeometry(pos,[...indices,...cliffIndices],4);g.setIndex(indices);const m=bank.clone();m.side=T.DoubleSide;part(scene,g,m,0,0,0);if(cliffIndices.length){const cliffs=g.clone();cliffs.setIndex(cliffIndices);rock.side=T.DoubleSide;part(scene,cliffs,rock,0,0,0);}
  }
  // Alternative channels cut through the banks; their retaining walls stop at the main channel.
@@ -54,19 +55,19 @@ export function addEnvironment(scene,track){
  }}
  instances(new T.CylinderGeometry(.35,.8,2,8),glow,markers);
  const placements=(stride,offset,scale,y=0)=>track.samples.filter((_,i)=>i%stride===0).flatMap((p,i)=>[-1,1].map(side=>({x:p.x+Math.cos(p.heading)*side*(p.width/2+offset),z:p.z-Math.sin(p.heading)*side*(p.width/2+offset),y,ry:p.heading+i*.5,scale})));
- if(!ice&&!city){instanceModel(scene,'palm',placements(24,20,4));instanceModel(scene,'rock',placements(48,14,4));instanceModel(scene,'hut',placements(144,24,4,3));instanceModel(scene,'pier',placements(144,9,4));instanceModel(scene,'ship',placements(240,24,3));instanceModel(scene,'wreck',placements(360,22,2.5));instanceModel(scene,'lighthouse',placements(360,35,4));}
+ if(!ice&&!city){instanceModel(scene,'palm',placements(24,20,4));instanceModel(scene,'rock',placements(48,14,4));instanceModel(scene,'hut',placements(144,24,4,3));instanceModel(scene,'pier',placements(144,9,4));instanceModel(scene,'ship',placements(240,24,3));instanceModel(scene,'wreck',placements(360,22,2.5));}
  if(ice){instances(new T.IcosahedronGeometry(1,0),bank,bergs);instanceModel(scene,'ship',placements(240,28,3));instanceModel(scene,'station',placements(240,35,15,6));}
  if(city){const foundations=[];for(let i=0;i<4;i++){const scale=13+i*3,sites=placements(96,26+i*16,scale,5);instanceModel(scene,'building'+i,sites);foundations.push(...sites.map(p=>({...p,y:1,sx:scale*1.7,sy:8,sz:scale*1.7})));}instances(new T.BoxGeometry(1,1,1),bank,foundations);instanceModel(scene,'street',placements(32,8,4,5));}
  // Three substantial drive-through landmarks, with generous boat clearance.
  for(const fraction of [.18,.48,.76]){
   const p=track.samples[Math.floor(track.samples.length*fraction)],g=new T.Group();g.position.set(p.x,0,p.z);g.rotation.y=p.heading;scene.add(g);const w=p.width/2;
-  for(const side of [-1,1])box(g,city?dark:rock,side*(w+3),10,0,6,20,ice?28:7);
+  for(const side of [-1,1])box(g,city?dark:ice?rock:dark,side*(w+3),10,0,6,20,ice?28:7);
   if(city){box(g,dark,0,15,0,w*2+12,3,fraction>.7?65:12);box(g,glow,0,13.3,-6,w*2, .3,.3);if(fraction>.7)for(const side of [-1,1])box(g,dark,side*(w+3),7,0,6,14,65);
    const holo=part(g,new T.PlaneGeometry(20,9),new T.MeshBasicMaterial({color:0x68bfff,transparent:true,opacity:.28,side:T.DoubleSide,depthWrite:false}),0,29,0);holo.userData.hologram=true;
    const sign=part(g,new T.PlaneGeometry(18,4),label(fraction<.3?'VOLT / 2099':'FULL THROTTLE'),0,20,0);sign.rotation.y=Math.PI;
    for(let k=-4;k<=4;k++){const traffic=box(g,glow,k*5,17,0,1,.6,2);traffic.userData.traffic=true;}
   }else if(ice){const roof=part(g,new T.CylinderGeometry(w+6,w+6,28,16,1,true,-Math.PI/2,Math.PI),bank,0,8,0);roof.rotation.set(-Math.PI/2,0,0);}
-  else {const arch=part(g,new T.TorusGeometry(w+3,4,8,24,Math.PI),rock,0,4,0);}
+  else {box(g,dark,0,16,0,w*2+12,.9,4);}
  }
  if(!ice&&!city){
   for(const p of placements(360,35,4)){const light=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0xffe3a0,transparent:true,blending:T.AdditiveBlending,depthWrite:false}));light.position.set(p.x,39,p.z);light.scale.set(7,7,1);scene.add(light);}

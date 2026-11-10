@@ -21,7 +21,7 @@ export function aiInput(b, track, difficulty=1, leader=0, boats=[]) {
  const tx=look.x+Math.cos(look.heading)*offset,tz=look.z-Math.sin(look.heading)*offset;
  const delta=angle(Math.atan2(tx-b.x,tz-b.z)-b.heading);
  const pace=[.69,.85,1][difficulty];
- const rubber=clamp(1+(leader-b.progress)/15000,.98,1.035);
+ const rubber=b.rival ? 1 : clamp(1+(leader-b.progress)/15000,.98,1.035);
  return { throttle:clamp(pace*rubber*(1-Math.min(.38,Math.abs(bend)*.25)),.35,1),
  steer:clamp(delta*(2.7+difficulty*.25),-1,1),
  boost:difficulty>0&&Math.abs(bend)<.24&&Math.abs(delta)<.16&&b.boost>[40,30,16][difficulty],

@@ -56,7 +56,7 @@ test('camera action uses a press latch and wall impacts preserve forward motion'
  stepBoat(b,{throttle:1},track,1/60,1);assert.ok(b.events.includes('scrape'));assert.ok(b.vx*Math.sin(p.heading)+b.vz*Math.cos(p.heading)>35);
 });
 
-test('six imported boat slots share source geometry and preserve material ownership',async()=>{
+test('six racing silhouettes batch hardware and preserve source asset ownership',async()=>{
  const previous=globalThis.document;
  globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({fillRect(){},fillText(){}})})};
  const T=await import('three');const {assets}=await import('../src/assets.js');
@@ -65,10 +65,10 @@ test('six imported boat slots share source geometry and preserve material owners
   for(let type=0;type<6;type++){
    const source=new T.Group(),geometry=new T.BoxGeometry(1+type*.1,1,3),material=new T.MeshStandardMaterial({color:0xffffff});
    geometry.userData.shared=true;source.add(new T.Mesh(geometry,material));assets.models.set('boat'+type,source);
-   const boat=buildBoat(type,'#ff6633'),hull=boat.children[0].children[0].children[0];
-   assert.equal(hull.geometry,geometry,'model geometry is reused');assert.notEqual(hull.material,material,'paint owns its material');
+   const boat=buildBoat(type,'#ff6633'),parts=[];boat.traverse(o=>{if(o.isMesh)parts.push(o);});
+   assert.equal(parts.length,3,'hardware batches plus livery deck');assert.ok(parts.some(o=>o.material.isMeshPhysicalMaterial&&o.material.clearcoat===1));assert.equal(geometry.userData.shared,true);
    assert.equal(material.color.getHex(),0xffffff,'source details remain reusable');assert.equal(boat.name,'boat');
-   assert.equal(boat.children.filter(o=>o.name==='flame').length,2);assert.ok(new T.Box3().setFromObject(boat).getSize(new T.Vector3()).z>=7.9);
+   assert.equal(boat.children.filter(o=>o.name==='flame').length,1);assert.ok(new T.Box3().setFromObject(boat).getSize(new T.Vector3()).z>=7.4);
    geometry.dispose();material.dispose();assets.models.delete('boat'+type);
   }
  } finally{globalThis.document=previous;}

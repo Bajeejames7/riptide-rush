@@ -3,6 +3,7 @@ import * as T from 'three';
 import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
 import {assets,mergeStatic} from '../src/assets.js';
 import {addEnvironment} from '../src/scenery.js';
+import {buildBoat} from '../src/render.js';
 import {makeTrack} from '../src/core/tracks.js';
 const manifest=JSON.parse(readFileSync('public/assets/manifest.json'));
 function imageSize(b){if(b[0]===137&&b.toString('ascii',1,4)==='PNG')return [b.readUInt32BE(16),b.readUInt32BE(20)];for(let i=2;i<b.length;){if(b[i++]!==255)continue;const marker=b[i++];if(marker===0xd9||marker===0xda)break;const length=b.readUInt16BE(i);if([0xc0,0xc1,0xc2].includes(marker))return [b.readUInt16BE(i+5),b.readUInt16BE(i+3)];i+=length;}throw Error('Invalid image');}
@@ -21,11 +22,13 @@ for(const name of manifest.models){
  assets.models.set(name,source);
 }
 globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},fillText(){}})})};
+let maxBoatTriangles=0;
+for(let type=0;type<6;type++){const boat=buildBoat(type,'#ff633a');let tris=0,calls=0;boat.traverse(o=>{if(o.isMesh){tris+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;calls++;}if(o.isSprite){tris+=2;calls++;}});maxBoatTriangles=Math.max(maxBoatTriangles,tris);if(calls>4)throw Error('Boat draw budget exceeded');console.log('Boat '+type+': '+tris+' triangles / '+calls+' draws');}
 for(let t=0;t<3;t++){
  const scene=new T.Scene();addEnvironment(scene,makeTrack(t));mergeStatic(scene);let triangles=0,draws=0;
  scene.traverse(o=>{if(o.isSprite){draws++;triangles+=2;}if(o.isMesh){const count=o.isInstancedMesh?o.count:1;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3*count;draws++;}});
  // Conservative whole-track scenery plus Low water, eight boats, ramp/start/pickup/effect allowance.
- const total=Math.ceil(triangles+160*160*2+8*300+12000),calls=draws+8*4+32;
+ const total=Math.ceil(triangles+160*160*2+8*maxBoatTriangles+12000),calls=draws+8*4+32;
  console.log(`${makeTrack(t).name}: whole scenery ${Math.ceil(triangles)} triangles/${draws} draws; total allowance ${total} triangles/${calls} draws`);
  if(total>250000||calls>150)throw Error('Low budget exceeded');
 }

@@ -97,3 +97,11 @@ npm run build
 Archives are kept only in memory while extracting whitelisted data extensions into git-ignored `assets-src/<pack>/`. Only selected data files are copied into `public/assets/`. No download or execution of Electron or electron-builder was performed for this round.
 
 Current shipped asset size: 14,068,123 bytes. Total acquisition remained below 60 MB including interrupted and diagnostic transfers, below the 300 MB budget; final shipped assets remain well below 120 MB.
+
+## Round 4 adaptations (no new external downloads)
+
+The six existing Kenney Watercraft hulls are rescaled individually and combined with original racing hardware: engine blocks, exhausts, intakes, windscreens, wings and twin sponsons. Each finished hull uses two merged hardware/paint meshes, one canvas livery deck and one boost sprite (four submissions). Original canvas liveries use two-tone paint, stripes, race numbers and invented sponsor marks (Tideline, Wakeworks, Deep Arc, Surge Co, Blue Shift, Sea Vector). Clearcoat paint uses the existing bundled HDR environments.
+
+Spray now uses an original 64px radial white alpha mask generated at runtime, additive blending and untone-mapped white particles; splash patches use the same soft mask. Existing Kenney flame sprites remain on exhausts. No generated raster art or additional downloaded assets were used.
+
+Sunspill banks now keep the existing Poly Haven sand set across the broad low beach/dune strip and reserve the rock set for the outer rise. Existing instanced palms, rocks, huts, piers, ships and wrecks supply the resort/harbour scenery. The castle-like beacon kit placements were removed, and the three stone arches were replaced with timber marina spans. The bundled beacon model remains in the manifest but is no longer placed on this course. Water normal scales/rotation and wake foam were adjusted in the shader without additional texture files.

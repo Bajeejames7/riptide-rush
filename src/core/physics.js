@@ -98,10 +98,11 @@ export function resetBoat(b, track) {
 }
 export function stepBoat(b, input, track, dt, time, laps = 3) {
   b.events = [];
+  if(b.eliminated) return;
   if(input.camera && !b.cameraLatch)b.cameraView=!b.cameraView;
   b.cameraLatch=!!input.camera;
   if (b.finished) input = { throttle: 0.2 };
-  const spec = BOATS[b.type],
+  const base = BOATS[b.type], u=b.upgrades||{}, spec={...base,speed:base.speed*(1+(u.engine||0)*.025),handling:base.handling*(1+(u.handling||0)*.04),boost:base.boost+(u.tank||0)*.035},
     n = nearest(track, b.x, b.z),
     w = wave(b.x, b.z, time);
   b.wrongWay =
@@ -113,7 +114,7 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
     b.resetCooldown = 1;
   }
   b.boosting = !!input.boost && b.boost > 0 && input.throttle > 0;
-  if (b.boosting) b.boost = Math.max(0, b.boost - 21 * dt);
+  if (b.boosting) b.boost = Math.max(0, b.boost - 21 * dt / (1+(b.upgrades?.tank||0)*.12));
   if (input.hop && !b.hopLatch && b.boost >= 12 && !b.air) {
     b.vy = 10;
     b.boost -= 12;
@@ -225,8 +226,9 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
 export function stepWorld(boats, track, dt, time, laps, inputs) {
   for (const p of track.pickups) p.cooldown = Math.max(0, p.cooldown - dt);
   boats.forEach((b, i) => stepBoat(b, inputs[i] || {}, track, dt, time, laps));
-  collideBoats(boats);
+  collideBoats(boats.filter(b=>!b.eliminated));
   const order = [...boats].sort((a, b) =>
+    a.eliminated !== b.eliminated ? (a.eliminated ? 1 : -1) :
     a.finished && b.finished
       ? a.finishTime - b.finishTime
       : a.finished
@@ -246,6 +248,7 @@ export function collideBoats(boats) {
         dz = a.z - b.z,
         d = Math.hypot(dx, dz);
       if (d < 4 && d > 0.01 && Math.abs(a.y - b.y) < 3) {
+        a.events?.push("bump");b.events?.push("bump");
         const push = (4 - d) * 0.5;
         a.x += (dx / d) * push;
         a.z += (dz / d) * push;

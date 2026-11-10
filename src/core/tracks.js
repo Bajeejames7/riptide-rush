@@ -37,7 +37,7 @@ export const TRACKS = [
     ],
   },
 ];
-export function makeTrack(index = 0) {
+export function makeTrack(index = 0, reverse = false) {
   const def = TRACKS[index % 3];
   const samples = [];
   const p = def.points.map(([x,z]) => [x*1.9,z*1.9]);
@@ -57,6 +57,7 @@ export function makeTrack(index = 0) {
           (-a[i] + 3 * b[i] - 3 * c[i] + d[i]) * t * t * t);
       samples.push({ x: f(0), z: f(1) });
     }
+  if(reverse) samples.splice(1, samples.length-1, ...samples.slice(1).reverse());
   let length = 0;
   for (let i = 0; i < samples.length; i++) {
     const a = samples[i],
@@ -76,7 +77,7 @@ export function makeTrack(index = 0) {
   ];
   return {
     ...def,
-    index,
+    index, reverse,
     samples,
     length,
     checkpointCount: p.length,

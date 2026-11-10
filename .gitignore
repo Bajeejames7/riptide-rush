@@ -6,5 +6,6 @@ release/
 .builder-cache/
 *.log
 .chrome-test/
+.chrome-round4/
 artifacts/
 assets-src/
