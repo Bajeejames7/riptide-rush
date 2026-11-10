@@ -7,3 +7,4 @@ release/
 *.log
 .chrome-test/
 artifacts/
+assets-src/

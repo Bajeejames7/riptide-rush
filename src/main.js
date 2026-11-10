@@ -1,4 +1,5 @@
 import "./style.css";
+import {preloadAssets} from './assets.js';
 import { Graphics } from "./render.js";
 import { Input, ACTIONS } from "./input.js";
 import { Audio } from "./audio.js";
@@ -57,12 +58,13 @@ try {
     settings.quality = 0;
     graphics.resize();
   }
+  await preloadAssets((fraction,name)=>{ui.innerHTML='<section class="panel"><div class="eyebrow">RIPTIDE RUSH</div><h2>Loading the waterfront</h2><progress max="1" value="'+fraction+'"></progress><p>'+Math.round(fraction*100)+'% / '+escapeHtml(name)+'</p></section>';});
   graphics.load(track);
 } catch (e) {
   ui.innerHTML =
-    '<div class="panel"><h2>Graphics could not start</h2><p>' +
+    '<div class="panel"><h2>Assets or graphics could not start</h2><p>' +
     escapeHtml(e.message) +
-    "</p><p>Riptide Rush requires a WebGL 2 capable graphics driver.</p></div>";
+    "</p><p>Check that the bundled assets are installed and a WebGL 2 graphics driver is available. Reload to retry.</p></div>";
   throw e;
 }
 function escapeHtml(s) {

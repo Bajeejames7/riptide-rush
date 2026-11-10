@@ -1,16 +1,17 @@
 import * as T from "three";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { addEnvironment, loftHull, softTexture } from "./scenery.js";
+import { addEnvironment } from "./scenery.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { nearest } from "./core/tracks.js";
-import { BOATS } from "./core/physics.js";
 import { waterVertex, waterFragment } from "./water.js";
+import {assets,model,surface,mergeStatic,skyLighting} from './assets.js';
 const tmp = new T.Vector3();
+let palette=new Map();
 function material(color, metalness = 0.2, roughness = 0.35) {
-  return new T.MeshStandardMaterial({ color, metalness, roughness });
+ const key=[color,metalness,roughness].join('/');if(!palette.has(key))palette.set(key,new T.MeshStandardMaterial({ color, metalness, roughness }));return palette.get(key);
 }
 function mesh(geo, mat, parent, x = 0, y = 0, z = 0) {
   const o = new T.Mesh(geo, mat);
@@ -23,111 +24,18 @@ function mesh(geo, mat, parent, x = 0, y = 0, z = 0) {
 function box(parent, mat, x, y, z, w, h, d) {
   return mesh(new T.BoxGeometry(w, h, d), mat, parent, x, y, z);
 }
-export function buildBoat(type, color) {
-  const g = new T.Group(),
-    spec = BOATS[type],
-    paint = new T.MeshPhysicalMaterial({color,metalness:.45,roughness:.24,clearcoat:1,clearcoatRoughness:.12}),
-    dark = material(0x111c2a, 0.7, 0.25),
-    white = material(0xe4eff2, 0.4, 0.25),
-    glass = new T.MeshPhysicalMaterial({
-      color: 0x09334a,
-      metalness: 0.7,
-      roughness: 0.08,
-      clearcoat: 1,
-    });
-  const widths = [1.75, 2.25, 2, 1.4, 2.1, 1.8],
-    w = widths[type],
-    len = [7.5, 7, 8.5, 8, 8.2, 7.2][type];
-  const profiles=[{w:w,l:len},{w:w*.47,l:len},{w:w*.45,l:len*.86},{w:w*.82,l:len*.8},{w:w*1.12,l:len},{w:w*.48,l:len}];
-  const profile=profiles[type];
-  const hulls=type===1?[-w*.7,w*.7]:type===5?[-w,0,w]:[0];
-  for(const x of hulls) mesh(loftHull(profile.w,profile.l,type),paint,g,x,0,0);
-  if(type===2) for(const side of [-1,1]) mesh(loftHull(.6,len*.65,2),paint,g,side*w,0,len*.15);
-  box(g, dark, 0, -0.4, -0.3, w * 1.5, 0.3, len * 0.63);
-  const cockpit = mesh(new T.SphereGeometry(1, 16, 10), glass, g, 0, 0.6, -0.2);
-  cockpit.scale.set(w * 0.55, 0.65, len * 0.22);
-  box(g, white, 0, 0.27, len * 0.25, 0.22, 0.06, len * 0.4);
-  for (const side of [-1, 1]) {
-    const pod = mesh(
-      new T.CylinderGeometry(0.48, 0.62, 2.1, 12),
-      dark,
-      g,
-      side * w * 0.62,
-      0.15,
-      -len * 0.37,
-    );
-    pod.rotation.x = Math.PI / 2;
-    const rim = mesh(
-      new T.TorusGeometry(0.43, 0.1, 8, 16),
-      white,
-      g,
-      side * w * 0.62,
-      0.15,
-      -len * 0.5,
-    );
-    const fin = box(
-      g,
-      paint,
-      side * w * 0.9,
-      0.55,
-      -len * 0.32,
-      0.16,
-      1.1,
-      1.8,
-    );
-    fin.rotation.z = -side * 0.18;
-    if (type === 1 || type === 4)
-      box(g, paint, side * (w + 0.35), -0.05, -0.25, 0.75, 0.55, len * 0.8);
-    if (type === 2 || type === 5)
-      box(g, dark, side * w * 0.65, 0.6, -len * 0.15, 0.55, 0.6, 1.8);
-  }
-  if (type % 2 === 0) {
-    box(g, dark, 0, 1, -len * 0.34, w * 1.8, 0.15, 0.7);
-    for (const s of [-1, 1])
-      box(g, white, s * w * 0.7, 0.6, -len * 0.34, 0.12, 0.8, 0.35);
-  } else {
-    for (const s of [-1, 1]) {
-      const fin = box(g, paint, s * w, 0.1, len * 0.1, 0.8, 0.12, 2);
-      fin.rotation.z = s * 0.17;
-    }
-  }
-  const cv = document.createElement("canvas");
-  cv.width = 256;
-  cv.height = 64;
-  const c = cv.getContext("2d");
-  c.fillStyle = color;
-  c.fillRect(0, 0, 256, 64);
-  c.fillStyle = "#071320";
-  c.font = "bold italic 40px sans-serif";
-  c.fillText(
-    String(type + 1).padStart(2, "0") +
-      " / " +
-      spec.name.toUpperCase().slice(0, 4),
-    8,
-    46,
-  );
-  const decal = new T.CanvasTexture(cv);
-  const plate = mesh(
-    new T.PlaneGeometry(1.5, 0.4),
-    new T.MeshBasicMaterial({ map: decal, side: T.DoubleSide }),
-    g,
-    0,
-    0.66,
-    len * 0.21,
-  );
-  plate.rotation.x = -Math.PI / 2 + .09;
-  for(const side of [-1,1]) {
-    box(g,dark,side*w*.45,.65,-len*.22,.5,.5,1.4);
-    for(let j=0;j<4;j++) box(g,white,side*w*.45,.93,-len*.28+j*.27,.55,.08,.12);
-    box(g,white,side*w*.7,-.25,-len*.5,.7,.08,.7);
-    const flame=mesh(new T.ConeGeometry(.4,2.8,12),new T.MeshBasicMaterial({color:new T.Color(.15,1.6,5),transparent:true,opacity:.65}),g,side*w*.62,.1,-len*.64);
-    flame.rotation.x=-Math.PI/2;flame.name="flame";flame.visible=false;
-    const vertices=[],indices=[];
-    for(let j=0;j<=16;j++) {const t=.52+j/16*.4,z=(t-.5)*len;for(const edge of [-1,1])vertices.push(side*w*.22+edge*.09,.395+t*t*.48,z);}
-    for(let j=0;j<16;j++){const a=j*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}
-    const stripe=new T.BufferGeometry();stripe.setAttribute("position",new T.Float32BufferAttribute(vertices,3));stripe.setIndex(indices);stripe.computeVertexNormals();mesh(stripe,white,g);
-  }
-  return g;
+export function buildBoat(type,color,number=type+1) {
+ const g=new T.Group();g.name='boat';g.userData.keep=true;
+ const hull=model('boat'+type);const bounds=new T.Box3().setFromObject(hull),size=bounds.getSize(new T.Vector3()),center=bounds.getCenter(new T.Vector3());
+ const scale=8/Math.max(size.x,size.z);hull.position.sub(center);const shell=new T.Group();shell.add(hull);shell.scale.setScalar(scale);shell.rotation.y=0;g.add(shell);
+ hull.traverse(o=>{if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;o.material=o.material.clone();o.material.userData.shared=false;o.material.metalness=.35;o.material.roughness=.3;o.material.envMapIntensity=1.15; o.material.onBeforeCompile=shader=>{shader.uniforms.racePaint={value:new T.Color(color)};shader.fragmentShader='uniform vec3 racePaint;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\nfloat chroma=max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b))-min(diffuseColor.r,min(diffuseColor.g,diffuseColor.b));\ndiffuseColor.rgb=mix(diffuseColor.rgb,racePaint*max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)),smoothstep(.12,.3,chroma));');};o.material.customProgramCacheKey=()=> 'race-paint-v1';});
+ const c=document.createElement('canvas');c.width=128;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,128,64);ctx.fillStyle='white';ctx.font='bold italic 50px sans-serif';ctx.textAlign='center';ctx.fillText(String(number).padStart(2,'0'),64,50);const decal=new T.CanvasTexture(c);decal.colorSpace=T.SRGBColorSpace;
+ shell.updateMatrixWorld(true);const ray=new T.Raycaster(new T.Vector3(0,8,1.7),new T.Vector3(0,-1,0)),hit=ray.intersectObject(shell,true)[0];
+ const plate=mesh(new T.PlaneGeometry(1.4,.7),new T.MeshBasicMaterial({map:decal,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2}),g,0,hit?hit.point.y+.025:.8,1.7);plate.rotation.x=-Math.PI/2;
+ if(hit){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);plate.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),normal);}
+
+ for(const side of [-1,1]){const flame=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0x77ccff,blending:T.AdditiveBlending,transparent:true,depthWrite:false}));flame.position.set(side*.85,.1,-4);flame.scale.set(1.2,3,1);flame.name='flame';flame.visible=false;g.add(flame);}
+ return g;
 }
 export class Graphics {
   constructor(canvas, settings) {
@@ -163,7 +71,7 @@ export class Graphics {
     this.particleMesh = new T.Points(
       this.particleGeo,
       new T.PointsMaterial({
-        map: softTexture(),
+        map: assets.textures.get('spray'),
         size: 1.8,
         vertexColors: true,
         transparent: true,
@@ -203,8 +111,8 @@ export class Graphics {
   }
   preview(canvas,type,color,time) {
     if(!this.previewRenderer){this.previewRenderer=new T.WebGLRenderer({alpha:true,antialias:true});this.previewRenderer.setSize(480,220);this.previewRenderer.toneMapping=T.ACESFilmicToneMapping;this.previewScene=new T.Scene();this.previewScene.add(new T.HemisphereLight(0xc9eaff,0x1c263c,2));const l=new T.DirectionalLight(0xffffff,3);l.position.set(5,8,8);this.previewScene.add(l);this.previewCamera=new T.PerspectiveCamera(36,480/220,.1,100);this.previewCamera.position.set(10,6,13);this.previewCamera.lookAt(0,0,0);}
-    if(this.previewKey!==type+color){if(this.previewBoat)this.previewScene.remove(this.previewBoat);this.previewBoat?.traverse(o=>{o.geometry?.dispose();if(o.material){for(const v of Object.values(o.material))if(v?.isTexture)v.dispose();o.material.dispose();}});this.previewBoat=buildBoat(type,color);this.previewScene.add(this.previewBoat);this.previewKey=type+color;}
-    this.previewScene.environment=this.scene.environment;this.previewBoat.rotation.y=time*.4;
+    if(this.previewKey!==type+color){if(this.previewBoat)this.previewScene.remove(this.previewBoat);this.previewBoat?.traverse(o=>{if(!o.geometry?.userData.shared)o.geometry?.dispose();if(o.material){for(const v of Object.values(o.material))if(v?.isTexture&&!v.userData.shared)v.dispose();o.material.dispose();}});this.previewBoat=buildBoat(type,color);this.previewScene.add(this.previewBoat);this.previewKey=type+color;}
+    this.previewEnvironments??=new Map();if(!this.previewEnvironments.has(this.track.theme)){const generator=new T.PMREMGenerator(this.previewRenderer);this.previewEnvironments.set(this.track.theme,generator.fromEquirectangular(assets.skies.get(this.track.theme)));generator.dispose();}this.previewScene.environment=this.previewEnvironments.get(this.track.theme).texture;this.previewBoat.rotation.y=time*.4;
     this.previewRenderer.render(this.previewScene,this.previewCamera);
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,480,220);ctx.drawImage(this.previewRenderer.domElement,0,0);
   }
@@ -246,21 +154,23 @@ export class Graphics {
     );
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
-    this.composer.setSize(innerWidth, innerHeight);
+    this.composer.setSize(this.settings.quality===0?1:innerWidth,this.settings.quality===0?1:innerHeight);
     this.renderer.shadowMap.enabled = this.settings.quality > 0;
+    this.bloom.enabled=this.settings.quality>0;
   }
   load(track) {
+    palette=new Map();
     this.track = track;
     for (const child of [...this.scene.children]) {
       if (child !== this.particleMesh)
         child.traverse((o) => {
-          o.geometry?.dispose();
+          if(!o.geometry?.userData.shared)o.geometry?.dispose();
           for (const m of Array.isArray(o.material)
             ? o.material
             : [o.material]) {
-            if (!m) continue;
+            if (!m || m.userData.shared) continue;
             for (const value of Object.values(m))
-              if (value?.isTexture) value.dispose();
+              if (value?.isTexture && !value.userData.shared) value.dispose();
             m.dispose();
           }
         });
@@ -276,12 +186,12 @@ export class Graphics {
     const hemi = new T.HemisphereLight(
       theme === "tropic" ? 0xccefff : 0x7f9bff,
       0x163a3b,
-      theme === "tropic" ? 1.3 : 1.5,
+      theme === "tropic" ? 1.3 : theme === "ice" ? .65 : .35,
     );
     this.scene.add(hemi);
     const sun = new T.DirectionalLight(
       theme === "tropic" ? 0xfff2d4 : 0xc99bff,
-      theme === "tropic" ? 2.1 : 1.8,
+      theme === "tropic" ? 2.1 : theme === "ice" ? .7 : .25,
     );
     sun.position.set(120, 220, -150);
     sun.castShadow = true;
@@ -294,23 +204,18 @@ export class Graphics {
     sun.shadow.normalBias = 0.05;
     this.scene.add(sun);
     this.scene.add(sun.target);this.sun=sun;
-    // A bounded radiance sky keeps the horizon blue even before tone mapping.
-    const sky=new T.Mesh(new T.SphereGeometry(1900,32,16),new T.ShaderMaterial({
-      side:T.BackSide,depthWrite:false,uniforms:{top:{value:new T.Color(theme==="tropic"?0x176ac0:theme==="ice"?0x172d61:0x030718)},bottom:{value:new T.Color(track.sky)}},
-      vertexShader:"varying vec3 p;void main(){p=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
-      fragmentShader:"uniform vec3 top,bottom;varying vec3 p;void main(){float h=clamp(normalize(p).y,0.,1.);gl_FragColor=vec4(mix(bottom,top,sqrt(h)),1.);}"}));
-    this.scene.add(sky);
-    const disc=mesh(new T.SphereGeometry(theme==="tropic"?20:13,24,16),new T.MeshBasicMaterial({color:new T.Color(theme==="tropic"?0xffdf9b:0xabcfff).multiplyScalar(3)}),this.scene,700,theme==="tropic"?600:300,-1000);
-    const glare=new T.Sprite(new T.SpriteMaterial({map:softTexture(),color:theme==="tropic"?0xffc46d:0x81aaff,transparent:true,opacity:.3,blending:T.AdditiveBlending,depthWrite:false}));
-    glare.position.copy(disc.position);glare.scale.set(140,140,1);this.scene.add(glare);
-    const envScene=new T.Scene();envScene.add(sky.clone());envScene.add(disc.clone());
+    const hdri=assets.skies.get(theme);this.scene.background=hdri;
+    this.scene.backgroundIntensity=theme==='city'?.55:.85;
+    const lighting=skyLighting(hdri);this.scene.fog=new T.Fog(lighting.horizon.multiplyScalar(this.scene.backgroundIntensity),330,1450);
+    this.sunOffset=lighting.direction.multiplyScalar(260);sun.position.copy(this.sunOffset);
     this.reflectionTarget?.dispose();this.reflectionTarget=new T.WebGLCubeRenderTarget(128,{type:T.HalfFloatType});
-    new T.CubeCamera(.5,2100,this.reflectionTarget).update(this.renderer,envScene);
-    const pmrem=new T.PMREMGenerator(this.renderer);
-    this.environment?.dispose();this.environment=pmrem.fromCubemap(this.reflectionTarget.texture);
-    this.scene.environment=this.environment.texture;pmrem.dispose();
+    const skyScene=new T.Scene();skyScene.background=hdri;new T.CubeCamera(.5,2100,this.reflectionTarget).update(this.renderer,skyScene);
+    this.environments??=new Map();if(!this.environments.has(theme)){const pmrem=new T.PMREMGenerator(this.renderer);this.environments.set(theme,pmrem.fromEquirectangular(hdri));pmrem.dispose();}this.environment=this.environments.get(theme);this.scene.environment=this.environment.texture;
+    this.particleMesh.material.map=assets.textures.get('spray');this.particleMesh.material.needsUpdate=true;
     this.waterUniforms = {
       time: { value: 0 },
+      shoreMap:{value:assets.textures.get('shore_'+theme)},
+      detailMap:{value:assets.textures.get('water_normal')},foamMap:{value:assets.textures.get('foam')},
       environmentMap:{value:this.reflectionTarget.texture},
       baseColor: { value: new T.Color(track.water) },
       skyColor: {
@@ -325,9 +230,6 @@ export class Graphics {
           () => new T.Vector4(10000, 10000, 0, 0),
         ),
       },
-      shore: {
-        value: Array.from({length:128},(_,i)=>track.samples[Math.floor(i*track.samples.length/128)]).map(p=>new T.Vector3(p.x,p.z,p.width)),
-      },
       width: { value: track.width },
       blockers: {
         value: track.obstacles.map((o) => new T.Vector4(o.x, o.z, o.radius, 0)),
@@ -337,7 +239,7 @@ export class Graphics {
     const waterMat = new T.ShaderMaterial({
       uniforms: this.waterUniforms,
       vertexShader: waterVertex,
-      fragmentShader: waterFragment,
+      fragmentShader: '#define WAKE_COUNT '+(this.settings.quality===0?24:64)+'\n'+waterFragment,
     });
     const waterGeo = new T.PlaneGeometry(
       2600,
@@ -348,23 +250,12 @@ export class Graphics {
     waterGeo.rotateX(-Math.PI / 2);
     this.water = mesh(waterGeo, waterMat, this.scene);
     this.water.castShadow = false;
-    const sand = material(
-        theme === "ice" ? 0xb6d9e7 : theme === "city" ? 0x17263b : 0xe6c28b,
-        0.05,
-        0.9,
-      ),
-      rock = material(theme === "ice" ? 0x76a9cc : 0x55766a, 0.15, 0.8),
-      green = material(0x257959, 0.05, 0.8),
+    const rock = surface(theme==='ice'?'snow':'rock'),
       neon = new T.MeshStandardMaterial({
         color: 0x37e5ed,
         emissive: 0x1b9ec0,
         emissiveIntensity: 3,
       });
-    let seed = track.seed;
-    const rand = () => {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      return seed / 4294967296;
-    };
     addEnvironment(this.scene,track);
     track.ramps.forEach((r) => {
       const group = new T.Group();
@@ -442,7 +333,7 @@ export class Graphics {
     track.pickups.forEach((p, i) => {
       const g = new T.Group();
       g.position.set(p.x, 2, p.z);
-      this.scene.add(g);
+      g.userData.keep=true;
       const m = new T.MeshStandardMaterial({
         color: p.large ? 0xffcb45 : 0x43ffdc,
         emissive: p.large ? 0xff8b15 : 0x16aa8e,
@@ -466,6 +357,13 @@ export class Graphics {
       ).rotation.x = Math.PI / 2;
       this.pickupModels.push(g);
     });
+    this.pickupBatches=[];
+    for(const large of [false,true]){
+      const indices=track.pickups.map((p,i)=>p.large===large?i:-1).filter(i=>i>=0);if(!indices.length)continue;
+      for(let part=0;part<2;part++){
+        const source=this.pickupModels[indices[0]].children[part],batch=new T.InstancedMesh(source.geometry,source.material,indices.length);batch.userData.keep=true;batch.instanceMatrix.setUsage(T.DynamicDrawUsage);this.scene.add(batch);this.pickupBatches.push({batch,indices,part});
+      }
+    }
     if (theme === "ice") {
       const geo = new T.PlaneGeometry(1400, 180, 100, 8);
       const mat = new T.ShaderMaterial({
@@ -481,26 +379,7 @@ export class Graphics {
       });
       mesh(geo, mat, this.scene, 0, 230, -500);
     }
-    if (theme === "city") {
-      const stars = new Float32Array(600 * 3);
-      for (let i = 0; i < 600; i++) {
-        stars[i * 3] = (rand() - 0.5) * 1600;
-        stars[i * 3 + 1] = 200 + rand() * 600;
-        stars[i * 3 + 2] = (rand() - 0.5) * 1600;
-      }
-      const geo = new T.BufferGeometry();
-      geo.setAttribute("position", new T.BufferAttribute(stars, 3));
-      this.scene.add(
-        new T.Points(geo, new T.PointsMaterial({ color: 0xa1c7ff, size: 1.4 })),
-      );
-    }
-    // Capture the built environment as well as the sky, including city windows.
-    this.water.visible=false;
-    const reflectionCamera=new T.CubeCamera(.5,2100,this.reflectionTarget);
-    reflectionCamera.position.set(start.x,5,start.z);reflectionCamera.update(this.renderer,this.scene);
-    this.water.visible=true;
-    const finalPmrem=new T.PMREMGenerator(this.renderer);this.environment.dispose();
-    this.environment=finalPmrem.fromCubemap(this.reflectionTarget.texture);this.scene.environment=this.environment.texture;finalPmrem.dispose();
+    mergeStatic(this.scene);
     this.scene.add(this.particleMesh);
     this.cameras.forEach((c) => c.position.set(start.x, 14, start.z - 25));
   }
@@ -520,6 +399,7 @@ export class Graphics {
     }
   }
   update(boats, time, dt) {
+    if(!this.waterUniforms)return;
     this.waterUniforms.time.value = time;
     this.wakeClock+=dt;
     if(this.wakeClock>.15){this.wakeClock=0;for(const b of boats)if(Math.abs(b.speed)>8)this.wakeHistory.unshift({x:b.x,z:b.z,heading:b.heading,life:1});}
@@ -529,7 +409,7 @@ export class Graphics {
     boats.forEach((b, i) => {
       let model = this.boatModels.get(b.id);
       if (!model) {
-        model = buildBoat(b.type, b.color);
+        model = buildBoat(b.type, b.color, i+1);
         this.boatModels.set(b.id, model);
         this.scene.add(model);
       }
@@ -548,7 +428,7 @@ export class Graphics {
       if ((b.landSerial||0)!==(model.userData.landSerial||0)) {
         model.userData.landSerial=b.landSerial;
         this.spray(b, 55, true);this.shake=.7;
-        const ring=mesh(new T.RingGeometry(1,1.5,40),new T.MeshBasicMaterial({color:0xc5f1ff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
+        const ring=mesh(new T.PlaneGeometry(4,4),new T.MeshBasicMaterial({map:assets.textures.get("foam"),color:0xc5f1ff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
         ring.rotation.x=-Math.PI/2;this.splashes.push({mesh:ring,life:1});
       }
       if(b.local&&b.boosting)this.shake=Math.max(this.shake,.12);
@@ -579,6 +459,7 @@ export class Graphics {
         });
       }
     });
+    for(const {batch,indices,part} of this.pickupBatches){indices.forEach((index,j)=>{const group=this.pickupModels[index];group.scale.setScalar(group.visible?1:0);group.updateMatrixWorld(true);batch.setMatrixAt(j,group.children[part].matrixWorld);});batch.instanceMatrix.needsUpdate=true;batch.computeBoundingSphere();}
     this.shake=Math.max(0,this.shake-dt*1.8);
     this.splashes=this.splashes.filter(s=>{s.life-=dt;const scale=1+(1-s.life)*13;s.mesh.scale.setScalar(scale);s.mesh.material.opacity=s.life*.6;if(s.life<=0){this.scene.remove(s.mesh);s.mesh.geometry.dispose();s.mesh.material.dispose();return false;}return true;});
     this.particles = this.particles.filter((p) => p.life > 0);
@@ -601,6 +482,7 @@ export class Graphics {
   render(players, dt, attract = false, time = 0) {
     const r = this.renderer,
       n = players.length || 1;
+    this.frameStats={views:[],maxCalls:0,maxTriangles:0};
     r.setScissorTest(false);
     r.setViewport(0, 0, innerWidth, innerHeight);
     r.clear();
@@ -652,9 +534,10 @@ export class Graphics {
       }
       if(b?.finished) {c.position.set(b.x+Math.sin(time*.4+1)*18,b.y+6,b.z+Math.cos(time*.4+1)*18);c.lookAt(b.x,b.y,b.z);}
       if(b) {
-        this.sun.target.position.set(b.x,0,b.z);this.sun.position.set(b.x+120,220,b.z-150);
+        this.sun.target.position.set(b.x,0,b.z);this.sun.position.copy(this.sunOffset).add(new T.Vector3(b.x,0,b.z));
         Object.assign(this.sun.shadow.camera,{left:-65,right:65,top:65,bottom:-65});this.sun.shadow.camera.updateProjectionMatrix();
       }
+      if(this.settings.quality===0){r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);r.render(this.scene,c);const stats={calls:r.info.render.calls,triangles:r.info.render.triangles};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);continue;}
       r.setScissorTest(false);
       if(this.postWidth!==w||this.postHeight!==h){this.composer.setSize(w,h);this.postWidth=w;this.postHeight=h;}
       this.vignette.uniforms.boost.value=b?.boosting?1:0;this.vignette.uniforms.time.value=time;
@@ -673,3 +556,4 @@ function whiteMaterial() {
 function darkMaterial() {
   return material(0x152839, 0.6, 0.3);
 }
+

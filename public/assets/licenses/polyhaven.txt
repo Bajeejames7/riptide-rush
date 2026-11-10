@@ -1,0 +1,5 @@
+Poly Haven assets
+Source and licence statement: https://polyhaven.com/license
+All Poly Haven HDRIs, textures and 3D models are licensed CC0.
+https://creativecommons.org/publicdomain/zero/1.0/
+Selected source URLs are in ASSETS.md.

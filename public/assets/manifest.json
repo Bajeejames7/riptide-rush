@@ -1,0 +1,46 @@
+{
+  "fields": [
+    "shore_tropic",
+    "shore_ice",
+    "shore_city"
+  ],
+  "models": [
+    "boat0",
+    "boat1",
+    "boat2",
+    "boat3",
+    "boat4",
+    "boat5",
+    "palm",
+    "rock",
+    "hut",
+    "pier",
+    "ship",
+    "wreck",
+    "lighthouse",
+    "station",
+    "street",
+    "building0",
+    "building1",
+    "building2",
+    "building3"
+  ],
+  "textures": [
+    "concrete_diff",
+    "concrete_nor_gl",
+    "concrete_rough",
+    "metal_diff",
+    "metal_nor_gl",
+    "metal_rough",
+    "rock_diff",
+    "rock_nor_gl",
+    "rock_rough",
+    "sand_diff",
+    "sand_nor_gl",
+    "sand_rough",
+    "snow_diff",
+    "snow_nor_gl",
+    "snow_rough",
+    "water_normal"
+  ]
+}

@@ -56,22 +56,20 @@ test('camera action uses a press latch and wall impacts preserve forward motion'
  stepBoat(b,{throttle:1},track,1/60,1);assert.ok(b.events.includes('scrape'));assert.ok(b.vx*Math.sin(p.heading)+b.vz*Math.cos(p.heading)>35);
 });
 
-test('six lofted hull variants have outward deck normals and arcade geometry budgets',async()=>{
+test('six imported boat slots share source geometry and preserve material ownership',async()=>{
  const previous=globalThis.document;
  globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({fillRect(){},fillText(){}})})};
+ const T=await import('three');const {assets}=await import('../src/assets.js');
  try {
   const {buildBoat}=await import('../src/render.js');
-  const signatures=new Set();
   for(let type=0;type<6;type++){
-   const boat=buildBoat(type,'#ff6633');let triangles=0;
-   boat.traverse(o=>{if(o.geometry)triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;});
-   assert.ok(triangles>=2000&&triangles<=4200,`hull ${type}: ${triangles} triangles`);
-   const hull=boat.children[0].geometry;
-   assert.ok(hull.attributes.normal.getY([24,18,16,24,24,16][type]*10)>0,'deck normal faces upward');
-   signatures.add(hull.attributes.position.count+':'+hull.boundingSphere?.radius+':'+boat.children.length);
-   boat.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+   const source=new T.Group(),geometry=new T.BoxGeometry(1+type*.1,1,3),material=new T.MeshStandardMaterial({color:0xffffff});
+   geometry.userData.shared=true;source.add(new T.Mesh(geometry,material));assets.models.set('boat'+type,source);
+   const boat=buildBoat(type,'#ff6633'),hull=boat.children[0].children[0].children[0];
+   assert.equal(hull.geometry,geometry,'model geometry is reused');assert.notEqual(hull.material,material,'paint owns its material');
+   assert.equal(material.color.getHex(),0xffffff,'source details remain reusable');assert.equal(boat.name,'boat');
+   assert.equal(boat.children.filter(o=>o.name==='flame').length,2);assert.ok(new T.Box3().setFromObject(boat).getSize(new T.Vector3()).z>=7.9);
+   geometry.dispose();material.dispose();assets.models.delete('boat'+type);
   }
-  assert.ok(signatures.size>=4);
  } finally{globalThis.document=previous;}
 });
-

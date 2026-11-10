@@ -35,33 +35,23 @@ uniform float time;
 uniform vec3 baseColor,skyColor,sunDir;
 uniform vec4 wakes[64];
 uniform samplerCube environmentMap;
+uniform sampler2D detailMap,foamMap,shoreMap;
+#ifndef WAKE_COUNT
+#define WAKE_COUNT 64
+#endif
 uniform vec4 blockers[2];
-uniform vec3 shore[128];
 uniform float width;
 uniform vec4 shortcuts[2];
 varying vec3 world,norm;
 void main() {
   vec2 uv=world.xz;
-  float detail=sin(uv.x*1.17+sin(uv.y*.73+time*.6))*sin(uv.y*1.31-time*.8);
-  vec3 n=normalize(norm+vec3(detail*.045,0.0,sin(uv.y*1.7+sin(uv.x*.91)-time)*.045));
+  vec3 detail=texture2D(detailMap,uv*.055+vec2(time*.008,time*.013)).xyz*2.-1.;
+  vec3 fine=texture2D(detailMap,uv*.093-vec2(time*.012,time*.006)).xyz*2.-1.;
+  vec3 n=normalize(norm+vec3(detail.x+fine.x,0.,detail.y+fine.y)*.16);
   vec3 v=normalize(cameraPosition-world);
   float fres=.035+.965*pow(1.0-max(dot(n,v),0.0),5.0);
-  float bank=10000.0;
-  float localWidth=width;
-  for(int i=0;i<128;i++) {
-    vec3 a=shore[i],b=shore[(i+1)-((i+1)/128)*128];
-    vec2 ab=b.xy-a.xy;
-    float t=clamp(dot(world.xz-a.xy,ab)/max(dot(ab,ab),.01),0.,1.);
-    float dist=distance(world.xz,a.xy+t*ab);
-    if(dist<bank){bank=dist;localWidth=mix(a.z,b.z,t);}
-  }
-  for(int i=0;i<2;i++){
-    vec2 a=shortcuts[i].xy,ab=shortcuts[i].zw-a;
-    float t=clamp(dot(world.xz-a,ab)/max(dot(ab,ab),.01),0.,1.);
-    float d=distance(world.xz,a+t*ab);
-    if(d<bank){bank=d;localWidth=22.;}
-  }
-  float shallow=smoothstep(localWidth*.22,localWidth*.53,bank);
+  float shoreDistance=texture2D(shoreMap,world.xz/2600.+.5).r*64.-32.;
+  float shallow=1.-smoothstep(0.,22.,-shoreDistance);
   float depth=mix(15.0,1.2,shallow);
   vec3 transmitted=mix(baseColor*1.8,baseColor*.55,1.0-exp(-depth*.13));
   vec3 reflected=reflect(-v,n);
@@ -69,18 +59,19 @@ void main() {
   vec3 col=mix(transmitted,reflectedSky,fres*.85+.1);
   float spec=pow(max(dot(reflect(-sunDir,n),v),0.0),180.0);
   col+=vec3(1.0,.85,.65)*spec*2.0;
-  float noise=sin(world.x*.45+sin(world.z*.5)+time*2.0);
-  float foam=shallow*smoothstep(.45,.8,noise);
+  float noise=texture2D(foamMap,world.xz*.08+vec2(time*.012)).r;
+  float edge=abs(shoreDistance);
+  float foam=exp(-edge*.45)*noise*.7;
   for(int i=0;i<2;i++) {
     float edge=abs(distance(world.xz,blockers[i].xy)-blockers[i].z);
     foam+=exp(-edge*1.4)*(.6+.4*sin(time*3.0+world.x));
   }
-  for(int i=0;i<64;i++) {
+  for(int i=0;i<WAKE_COUNT;i++) {
     vec2 d=world.xz-wakes[i].xy;
     float along=dot(d,vec2(sin(wakes[i].z),cos(wakes[i].z)));
     float side=abs(dot(d,vec2(cos(wakes[i].z),-sin(wakes[i].z))));
     float wake=exp(-abs(side+along*.25)*1.2)*(1.0-smoothstep(-4.0,0.0,along))*smoothstep(-24.0,-2.0,along)*wakes[i].w;
-    foam+=wake*(i<8?1.:.09);
+    foam+=wake*noise*(i<8?1.:.09);
     foam+=exp(-side*side*.6)*smoothstep(-15.,-3.,along)*(1.-smoothstep(-3.,0.,along))*wakes[i].w*(i<8?.45:.03);
   }
   col=mix(col,vec3(.65,.87,.94),clamp(foam*.7,0.0,.85));

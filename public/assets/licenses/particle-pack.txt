@@ -1,0 +1,6 @@
+Kenney Particle Pack
+Source: https://kenney.nl/assets/particle-pack
+Author: Kenney
+License: Creative Commons Zero (CC0 1.0), as stated on the source page.
+https://creativecommons.org/publicdomain/zero/1.0/
+PNG entries recovered from a partial download; the archive licence entry was not reached.

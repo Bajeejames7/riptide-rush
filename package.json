@@ -1,7 +1,7 @@
 {
   "name": "riptide-rush",
   "version": "1.0.0",
-  "description": "Original procedural arcade powerboat racing",
+  "description": "Original arcade powerboat racing with bundled CC0 art",
   "author": "Riptide Rush",
   "license": "MIT",
   "type": "module",
@@ -11,7 +11,8 @@
     "build": "vite build --configLoader native",
     "start": "electron .",
     "test": "node --test --test-isolation=none test/*.test.js",
-    "dist": "npm run build && node scripts/icon.mjs && node scripts/package.mjs"
+    "dist": "npm run build && node scripts/icon.mjs && node scripts/package.mjs",
+    "assets:audit": "node scripts/audit-assets.mjs"
   },
   "dependencies": {
     "three": "latest",

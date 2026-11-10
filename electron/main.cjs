@@ -1,9 +1,23 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, protocol, net } = require("electron");
 const path = require("node:path");
 const { hostGame, discover, addresses } = require("./server.cjs");
+const { pathToFileURL } = require('node:url');
+const { resolveAssetUrl } = require('./assets.cjs');
+protocol.registerSchemesAsPrivileged([{scheme:'riptide-assets',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 let hosted, window;
 app.setPath("userData", path.join(app.getPath("appData"), "Riptide Rush"));
 app.whenReady().then(() => {
+  // Serve only bundled art through a fetch-capable scheme. Keep the existing file
+  // page origin so saved records, settings and controller bindings stay available.
+  protocol.handle('riptide-assets', async (request) => {
+    try {
+      const target=resolveAssetUrl(request.url,path.join(__dirname,'../dist/assets'));
+      if(!target || request.method!=='GET') return new Response('Not found',{status:404});
+      const result=await net.fetch(pathToFileURL(target).toString());
+      const headers=new Headers(result.headers);headers.set('Access-Control-Allow-Origin','*');
+      return new Response(result.body,{status:result.status,headers});
+    } catch { return new Response('Bundled asset unavailable',{status:404,headers:{'Access-Control-Allow-Origin':'*'}}); }
+  });
   window = new BrowserWindow({
     width: 1440,
     height: 900,
