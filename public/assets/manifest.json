@@ -5,12 +5,12 @@
     "shore_city"
   ],
   "models": [
-    "boat0",
-    "boat1",
-    "boat2",
-    "boat3",
-    "boat4",
-    "boat5",
+    "sf_speedboat2",
+    "sf_speedboat1",
+    "sf_speedboat_vrpspu",
+    "sf_myspeedboat",
+    "sf_cyberpunk",
+    "sf_futuristic",
     "palm",
     "rock",
     "hut",

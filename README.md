@@ -1,6 +1,6 @@
 # Riptide Rush
 
-An original Electron / Three.js arcade powerboat racer with bundled CC0 boat and scenery models, photographic PBR terrain, HDR skies, and sprite effects. Gameplay runs fully offline after installation. See ASSETS.md for sources, licensing, file sizes, and the asset preparation steps.
+An original Electron / Three.js arcade powerboat racer with bundled CC BY / CC BY-NC racing boats and CC0 scenery models, photographic PBR terrain, HDR skies, and sprite effects. Gameplay runs fully offline after installation. See ASSETS.md for sources, licensing, file sizes, and the asset preparation steps.
 
 ## Run and package
 
@@ -52,4 +52,8 @@ Each connection supports up to four local players, with eight total boats. All c
 
 All static art is under `public/assets/` and Vite copies it into `dist/assets/`; the existing electron-builder `dist/**/*` entry includes it. Startup preloads models, sprites, textures and all three HDRIs with progress and a visible error on failure. Asset source archives are extracted as data only into ignored `assets-src/`; no download is required to build or play.
 
-`npm run assets:audit` inspects bundled GLBs and calculates conservative whole-course Low geometry estimates. It is separate from the asset-free `npm test` suite. For runtime checks, use `?verify=1&track=0` (or 1 / 2); `window.rrVerify.graphics.frameStats` exposes actual Low per-viewport calls and triangles. Hardware frame rate and visual acceptance must be checked on the target PC. Preparation scripts and all sources are documented in ASSETS.md.
+`npm run assets:audit` inspects bundled GLBs and calculates conservative whole-course Low geometry estimates. The `npm test` suite also validates all six shipped boats, credits, dimensions and shared rendering resources. For runtime checks, use `?verify=1&track=0` (or 1 / 2); `window.rrVerify.graphics.frameStats` exposes actual Low per-viewport calls and triangles. Hardware frame rate and visual acceptance must be checked on the target PC. Preparation scripts and all sources are documented in ASSETS.md.
+
+## Third-party boat licences
+
+The six Sketchfab boats are credited in the main menu and Settings Credits, and in [ASSETS.md](ASSETS.md). Speedboat n°1 and n°2 by Jonathan Geoffroy are CC BY-NC 4.0: the game may be shared for free but must not be sold while these models are included. The software licence does not override these asset licences.

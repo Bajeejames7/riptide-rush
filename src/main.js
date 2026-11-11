@@ -1,3 +1,4 @@
+import boatCredits from "../public/assets/models/sf_boats.json" with {type:"json"};
 import {EVENTS,TIERS,PAINTS,loadSlots,saveSlots,freshSave,totalStars,unlocked,canEnter,upgrade,createEvent,stepEvent,completeEvent} from './core/career.js';
 import "./style.css";
 import {preloadAssets} from './assets.js';
@@ -144,7 +145,7 @@ function home() {
   }
   page(
     "",
-    `<div class="tag">FULL THROTTLE. OPEN WATER.</div><h1>RIPTIDE<br><span>RUSH</span></h1><p class="subtitle">Chase the horizon. Carve through sunlit islands, frozen canyons and an electric city after dark.</p><div class="menu">${button("career", "Career", true)}${button("single", "Single Race")}${button("champ", "Championship")}${button("trial", "Time Trial")}${button("local", "Local Multiplayer")}${button("online", "Online / LAN")}${button("settings", "Settings & Controls")}${button("help", "How to Play")}</div><div class="footer">PROCEDURAL WORLDS · 1–4 LOCAL · 8 ONLINE · OFFLINE READY</div>`,
+    `<div class="tag">FULL THROTTLE. OPEN WATER.</div><h1>RIPTIDE<br><span>RUSH</span></h1><p class="subtitle">Chase the horizon. Carve through sunlit islands, frozen canyons and an electric city after dark.</p><div class="menu">${button("career", "Career", true)}${button("single", "Single Race")}${button("champ", "Championship")}${button("trial", "Time Trial")}${button("local", "Local Multiplayer")}${button("online", "Online / LAN")}${button("settings", "Settings & Controls")}${button("help", "How to Play")}${button("credits", "Credits")}</div><div class="footer">PROCEDURAL WORLDS · 1–4 LOCAL · 8 ONLINE · OFFLINE READY</div>`,
   );
   on("career",()=>careerMap());
   on("single", () => setup("Single Race"));
@@ -153,6 +154,7 @@ function home() {
   on("local", () => setup("Local Multiplayer"));
   on("online", networkMenu);
   on("settings", () => options(home));
+  on("credits",()=>credits(home));
   on("help", help);
 }
 function help() {
@@ -462,11 +464,17 @@ function finish() {
   });
   on("home", home);
 }
+function credits(back){
+ screen="credits";
+ const packs=[['Kenney','Watercraft Kit','https://kenney.nl/assets/watercraft-kit'],['Kenney','Pirate Kit','https://kenney.nl/assets/pirate-kit'],['Kenney','City Kit Commercial','https://kenney.nl/assets/city-kit-commercial'],['Kenney','Particle Pack','https://kenney.nl/assets/particle-pack'],...['kloofendal_48d_partly_cloudy_puresky','qwantani_dusk_2_puresky','shanghai_bund','aerial_beach_01','rock_boulder_dry','snow_02','concrete_floor_02','metal_plate'].map(id=>['Poly Haven',id,'https://polyhaven.com/a/'+id])];
+ page("Credits",`<div class="card subtitle"><p>Speedboat n°1 and n°2 by Jonathan Geoffroy are CC BY-NC 4.0. The game may be shared for free but must not be sold while these boats are included.</p>${boatCredits.map(b=>`<p><b>${b.title}</b> - ${b.author} / ${b.license}<br><a href="${b.url}" target="_blank" rel="noopener noreferrer">${b.url}</a><br>Optimised and normalised for Riptide Rush; selectable paint where available.</p>`).join('')}${packs.map(([author,title,url])=>`<p><b>${title}</b> - ${author} / CC0<br><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></p>`).join('')}<p>Courses, gameplay, audio and supporting procedural textures: Riptide Rush.</p></div>${button("back","Back",false,true)}`);
+ on("back",back);
+}
 function options(back) {
   screen = "settings";
   page(
     "Tune your ride",
-    `<div class="card"><label>Unlock everything for party play<select id="party"><option value="0" ${!settings.partyPlay?"selected":""}>Off</option><option value="1" ${settings.partyPlay?"selected":""}>On</option></select></label><div class="row"><label>Graphics quality<select id="quality">${["Low", "Medium", "High", "Ultra"].map((q, i) => `<option value="${i}" ${settings.quality === i ? "selected" : ""}>${q}</option>`).join("")}</select></label><label>Resolution scale <span id="scaleValue">${Math.round(settings.scale * 100)}%</span><input id="scale" type="range" min="0.5" max="1.5" step="0.1" value="${settings.scale}"></label></div>${["master", "music", "sfx"].map((k) => `<label>${k === "sfx" ? "Effects & engines" : k[0].toUpperCase() + k.slice(1)}<input id="${k}" type="range" min="0" max="1" step="0.05" value="${settings[k]}"></label>`).join("")}<div class="row">${button("fullscreen", "Toggle Fullscreen")}${button("remap", "Remap Controls")}</div></div><div class="card muted">Best laps<br>${TRACKS.map((t, i) => `${t.name}: ${clock(records[i])}`).join("<br>")}</div>${button("back", "Back", false, true)}`,
+    `<div class="card"><label>Unlock everything for party play<select id="party"><option value="0" ${!settings.partyPlay?"selected":""}>Off</option><option value="1" ${settings.partyPlay?"selected":""}>On</option></select></label><div class="row"><label>Graphics quality<select id="quality">${["Low", "Medium", "High", "Ultra"].map((q, i) => `<option value="${i}" ${settings.quality === i ? "selected" : ""}>${q}</option>`).join("")}</select></label><label>Resolution scale <span id="scaleValue">${Math.round(settings.scale * 100)}%</span><input id="scale" type="range" min="0.5" max="1.5" step="0.1" value="${settings.scale}"></label></div>${["master", "music", "sfx"].map((k) => `<label>${k === "sfx" ? "Effects & engines" : k[0].toUpperCase() + k.slice(1)}<input id="${k}" type="range" min="0" max="1" step="0.05" value="${settings[k]}"></label>`).join("")}<div class="row">${button("fullscreen", "Toggle Fullscreen")}${button("remap", "Remap Controls")}${button("credits", "Credits")}</div></div><div class="card muted">Best laps<br>${TRACKS.map((t, i) => `${t.name}: ${clock(records[i])}`).join("<br>")}</div>${button("back", "Back", false, true)}`,
   );
   $("#party").onchange=e=>{settings.partyPlay=!!+e.target.value;save();normalizeChoices();};
   $("#quality").onchange = (e) => {
@@ -491,6 +499,7 @@ function options(back) {
       window.desktop?.fullscreen() ||
       document.documentElement.requestFullscreen?.(),
   );
+  on("credits",()=>credits(()=>options(back)));
   on("remap", () => remap(() => options(back)));
   on("back", back);
 }
@@ -637,7 +646,7 @@ function connect(ip, port, isHost, addresses = []) {
         startRace(m.boats);
       }
       if (m.type === "snapshot") {
-        if (!["race", "pause", "settings", "remap", "results"].includes(screen))
+        if (!["race", "pause", "settings", "remap", "credits", "results"].includes(screen))
           return;
         online.serverTime = m.time;
         for (const s of m.boats) {
@@ -804,7 +813,7 @@ function frame(now) {
   }
   if (
     screen === "race" ||
-    (online && ["pause", "settings", "remap"].includes(screen))
+    (online && ["pause", "settings", "remap", "credits"].includes(screen))
   ) {
     if (
       screen === "race" &&

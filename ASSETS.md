@@ -1,6 +1,6 @@
 # Bundled art assets
 
-All downloaded game assets are CC0. Only Kenney and Poly Haven download hosts were used. No downloaded code, scripts, executables or editor projects were executed. Original race names, layouts, physics, UI and audio remain project content.
+The bundled scenery, textures and particles are CC0; the six Sketchfab racing boats are CC BY 4.0 or CC BY-NC 4.0 as listed below. No downloaded code, scripts, executables or editor projects were executed. Original race names, layouts, physics, UI and audio remain project content.
 
 ## Downloaded packs
 
@@ -19,12 +19,6 @@ Embedded palette PNGs are included inside each GLB as data URIs, so no external 
 
 | Shipped file | Original pack / file | Shipped bytes | Triangles per model |
 | --- | --- | ---: | ---: |
-| `models/boat0.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-a.glb` | 28,268 | 156 |
-| `models/boat1.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-b.glb` | 27,540 | 148 |
-| `models/boat2.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-c.glb` | 28,136 | 154 |
-| `models/boat3.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-d.glb` | 35,284 | 250 |
-| `models/boat4.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-e.glb` | 36,864 | 265 |
-| `models/boat5.glb` | `assets-src\watercraft-kit\Models\GLB format\boat-speed-f.glb` | 34,036 | 234 |
 | `models/palm.glb` | `assets-src\pirate-kit\Models\GLB format\palm-detailed-bend.glb` | 65,424 | 482 |
 | `models/rock.glb` | `assets-src\pirate-kit\Models\GLB format\rocks-a.glb` | 41,052 | 264 |
 | `models/hut.glb` | `assets-src\pirate-kit\Models\GLB format\structure.glb` | 41,400 | 276 |
@@ -96,12 +90,21 @@ npm run build
 
 Archives are kept only in memory while extracting whitelisted data extensions into git-ignored `assets-src/<pack>/`. Only selected data files are copied into `public/assets/`. No download or execution of Electron or electron-builder was performed for this round.
 
-Current shipped asset size: 14,068,123 bytes. Total acquisition remained below 60 MB including interrupted and diagnostic transfers, below the 300 MB budget; final shipped assets remain well below 120 MB.
+The round 5 audit reports the current shipped asset size. Total acquisition remained below 60 MB including interrupted and diagnostic transfers, below the 300 MB budget; final shipped assets remain well below 120 MB.
 
-## Round 4 adaptations (no new external downloads)
+## Round 5 racing boats
 
-The six existing Kenney Watercraft hulls are rescaled individually and combined with original racing hardware: engine blocks, exhausts, intakes, windscreens, wings and twin sponsons. Each finished hull uses two merged hardware/paint meshes, one canvas livery deck and one boost sprite (four submissions). Original canvas liveries use two-tone paint, stripes, race numbers and invented sponsor marks (Tideline, Wakeworks, Deep Arc, Surge Co, Blue Shift, Sea Vector). Clearcoat paint uses the existing bundled HDR environments.
+Six prepared Sketchfab models replace all Kenney racing hulls. They retain +Z bow orientation, 8-unit length and the authored waterline. Material primitives are batched once per model and shared between instances; only `paint` materials are cloned and recoloured. Other boats retain the artist's colours and use an identity strip. Old racing hardware and decals are removed. Kenney boat0?boat5 files are no longer shipped; the Watercraft ship remains scenery.
 
-Spray now uses an original 64px radial white alpha mask generated at runtime, additive blending and untone-mapped white particles; splash patches use the same soft mask. Existing Kenney flame sprites remain on exhausts. No generated raster art or additional downloaded assets were used.
+Speedboat n°1 and n°2 by Jonathan Geoffroy are **CC BY-NC 4.0**: the game may be shared for free but must not be sold while they are included. The software licence does not override asset licences. All six were optimised and normalised outside this round; no downloads or preparation reruns were performed.
 
-Sunspill banks now keep the existing Poly Haven sand set across the broad low beach/dune strip and reserve the rock set for the outer rise. Existing instanced palms, rocks, huts, piers, ships and wrecks supply the resort/harbour scenery. The castle-like beacon kit placements were removed, and the three stone arches were replaced with timber marina spans. The bundled beacon model remains in the manifest but is no longer placed on this course. Water normal scales/rotation and wake foam were adjusted in the shader without additional texture files.
+| Shipped model | Title | Author | Licence / source | Shipped bytes | Triangles |
+| --- | --- | --- | --- | ---: | ---: |
+| `models/sf_speedboat1.glb` | Speedboat n°1 | Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/9c8400c0580b4deda9bd6ad2aa84e421) | 463,728 | 11,780 |
+| `models/sf_speedboat2.glb` | Speedboat n°2 | Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/66da3d79c45c41719c19fb80d0009bef) | 557,592 | 11,829 |
+| `models/sf_myspeedboat.glb` | My Speed Boat... | MeRockNRollin | [CC BY 4.0](https://sketchfab.com/3d-models/d10195be58b74ba98a047a97c31c446e) | 887,828 | 7,207 |
+| `models/sf_futuristic.glb` | Futuristic Speedboat | dylanheyes | [CC BY 4.0](https://sketchfab.com/3d-models/5a8f4d21472e4b2b8ec4d23f70cf8cbc) | 1,021,496 | 11,995 |
+| `models/sf_cyberpunk.glb` | Cyberpunk Speedboat | jungle_jim | [CC BY 4.0](https://sketchfab.com/3d-models/1455b50eb92442d18c462a56428fdbec) | 934,628 | 11,958 |
+| `models/sf_speedboat_vrpspu.glb` | Speedboat | vrpspu | [CC BY 4.0](https://sketchfab.com/3d-models/9916bd4433024202ab84e43426fc2139) | 4,645,416 | 12,114 |
+
+On Low, transmission and clearcoat are disabled, reflections are reduced, and the cabin boat uses a single opaque pass for its shared palette variants. All model triangles remain. The audit caps eight boats including boost/identity accents at 100 draws and 100,000 triangles; its conservative whole-course allowance is now 350,000 triangles / 220 draws to include the detailed fleet. The worst eight-copy fleet is 97,024 triangles / 96 draws.

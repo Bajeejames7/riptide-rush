@@ -4,6 +4,12 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export const assets={models:new Map(),textures:new Map(),skies:new Map()};
 const base=globalThis.location?.protocol==='file:'?'riptide-assets://bundle/':(import.meta.env?.BASE_URL ?? './')+'assets/';
+// Legacy Sketchfab specular/glossiness paint is converted to current PBR parameters.
+export function boatMaterialExtension(parser){return {
+ name:'KHR_materials_pbrSpecularGlossiness',
+ getMaterialType(index){if(parser.json.materials[index].extensions?.[this.name])return T.MeshStandardMaterial;return null;},
+ extendMaterialParams(index,params){const ext=parser.json.materials[index].extensions?.[this.name];if(!ext)return Promise.resolve();const c=ext.diffuseFactor??[1,1,1,1];params.color=new T.Color().setRGB(...c.slice(0,3));params.opacity=c[3];params.metalness=0;params.roughness=1-(ext.glossinessFactor??1);return ext.diffuseTexture?parser.assignTexture(params,'map',ext.diffuseTexture,T.SRGBColorSpace):Promise.resolve();}
+ };}
 let pending;
 export function preloadAssets(progress=()=>{}) {
  if(pending)return pending;
@@ -13,7 +19,7 @@ export function preloadAssets(progress=()=>{}) {
   await Promise.all(jobs.map(async([kind,name])=>{
    const url=base+(kind==='model'?'models/'+name+'.glb':kind==='sky'?'skies/'+name+'.hdr':kind==='sprite'?'sprites/'+name+'.png':'textures/'+name+(kind==='field'?'.png':'.jpg'));
    try {
-    if(kind==='model'){const g=await new GLTFLoader().loadAsync(url);assets.models.set(name,g.scene);g.scene.traverse(o=>{if(o.geometry)o.geometry.userData.shared=true;if(o.material)o.material.userData.shared=true;});}
+    if(kind==='model'){const g=await new GLTFLoader().register(boatMaterialExtension).loadAsync(url);assets.models.set(name,g.scene);g.scene.traverse(o=>{if(o.geometry)o.geometry.userData.shared=true;if(o.material)for(const m of Array.isArray(o.material)?o.material:[o.material]){m.userData.shared=true;for(const t of Object.values(m))if(t?.isTexture)t.userData.shared=true;}});}
     else if(kind==='sky'){const t=await new HDRLoader().loadAsync(url);t.mapping=T.EquirectangularReflectionMapping;t.userData.shared=true;assets.skies.set(name,t);}
     else {const t=await new T.TextureLoader().loadAsync(url);t.wrapS=t.wrapT=kind==='field'?T.ClampToEdgeWrapping:T.RepeatWrapping;if(kind==='field')t.flipY=false;t.userData.shared=true;if(name.endsWith('_diff'))t.colorSpace=T.SRGBColorSpace;assets.textures.set(name,t);}
     progress(++done/jobs.length,name);

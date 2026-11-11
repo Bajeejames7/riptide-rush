@@ -31,6 +31,6 @@ test('static batching preserves instance and animated objects; HDR light follows
 
 test('desktop asset URLs stay inside the bundled directory',async()=>{
  const {createRequire}=await import('node:module'),path=await import('node:path');const {resolveAssetUrl}=createRequire(import.meta.url)('../electron/assets.cjs');const root=path.resolve('dist/assets');
- assert.equal(resolveAssetUrl('riptide-assets://bundle/models/boat0.glb',root),path.join(root,'models/boat0.glb'));
+ assert.equal(resolveAssetUrl('riptide-assets://bundle/models/sf_speedboat2.glb',root),path.join(root,'models/sf_speedboat2.glb'));
  for(const url of ['https://example.com/x.glb','riptide-assets://other/a.glb','riptide-assets://bundle/%2e%2e%5csecret.txt','riptide-assets://bundle/C:/secret.txt','riptide-assets://bundle/main.cjs'])assert.equal(resolveAssetUrl(url,root),null);
 });

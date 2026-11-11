@@ -1,3 +1,4 @@
+import {boatDimensions,contactRadius} from "./boat-models.js";
 import { nearest, onShortcut } from "./tracks.js";
 export const BOATS = [
   { name: "Kestrel", speed: 65, accel: 27, handling: 2.0, boost: 1.42 },
@@ -190,7 +191,7 @@ export function stepBoat(b, input, track, dt, time, laps = 3) {
     const dx = b.x - o.x,
       dz = b.z - o.z,
       d = Math.hypot(dx, dz);
-    if (d < o.radius + 2) {
+    if (d < o.radius + contactRadius(b,dx/(d||1),dz/(d||1))) {
       b.x += (dx / (d || 1)) * 2;
       b.z += (dz / (d || 1)) * 2;
       b.speed *= 0.95;
@@ -247,9 +248,10 @@ export function collideBoats(boats) {
         dx = a.x - b.x,
         dz = a.z - b.z,
         d = Math.hypot(dx, dz);
-      if (d < 4 && d > 0.01 && Math.abs(a.y - b.y) < 3) {
+      const reach=d>0?contactRadius(a,dx/d,dz/d)+contactRadius(b,dx/d,dz/d):0;
+      if (d < reach && d > 0.01 && Math.abs(a.y - b.y) < Math.max(boatDimensions(a.type).height,boatDimensions(b.type).height)) {
         a.events?.push("bump");b.events?.push("bump");
-        const push = (4 - d) * 0.5;
+        const push = (reach - d) * 0.5;
         a.x += (dx / d) * push;
         a.z += (dz / d) * push;
         b.x -= (dx / d) * push;
