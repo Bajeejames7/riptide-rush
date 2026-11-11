@@ -35,7 +35,7 @@ try {
   const send = (method, params = {}) =>
     new Promise((r) => (pending.set(++id, r), ws.send(JSON.stringify({ id, method, params }))));
   await sleep(+waitMs);
-  const res = await send("Runtime.evaluate", { expression: `JSON.stringify(${expr})`, awaitPromise: true, returnByValue: true });
+  const res = await send("Runtime.evaluate", { expression: `Promise.resolve(${expr}).then((v) => JSON.stringify(v))`, awaitPromise: true, returnByValue: true });
   console.log(res.result?.result?.value ?? JSON.stringify(res.result));
   const shot = await send("Page.captureScreenshot", { format: "jpeg", quality: 82 });
   fs.writeFileSync(out, Buffer.from(shot.result.data, "base64"));

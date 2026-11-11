@@ -30,15 +30,16 @@ export function terrainMaterial(theme,quality){
    vec2 landUV=landPosition.xz*.075;
    float macro=sin(landPosition.x*.031+sin(landPosition.z*.043)*2.);
    float stone=smoothstep(.24,.62,1.-abs(normalize(landNormal).y)+macro*.055);
-   vec3 ground=texture2D(map,landUV).rgb;
-   ${quality===0?"ground=mix(ground,ground*vec3(.44,.49,.55),stone);":"ground=mix(ground,texture2D(landRock,landUV*.87).rgb,stone);"}
+   // Steep faces get real rock, projected from the side so it does not smear down the cliff.
+   vec2 sideUV=vec2(landPosition.x+landPosition.z,landPosition.y*1.4)*.06;
+   ${quality===0?"vec3 ground=texture2D(map,stone>.5?sideUV:landUV).rgb;ground=mix(ground,ground*vec3(.7,.64,.58),stone);":"vec3 ground=mix(texture2D(map,landUV).rgb,texture2D(landRock,sideUV).rgb*1.15,stone);"}
    ground*=.94+.06*macro;
    ${theme==='ice'?"ground=mix(ground*.84,ground,smoothstep(-1.,2.,landPosition.y));":"ground*=mix(.65,1.,smoothstep(-.7,2.,landPosition.y));"}
    diffuseColor.rgb*=ground;
   `);
   s.fragmentShader=s.fragmentShader.replace('#include <normal_fragment_maps>',`vec3 mapN=texture2D(normalMap,landUV).xyz*2.-1.;mapN.xy*=normalScale;normal=normalize(getTangentFrame(-vViewPosition,normal,landUV)*mapN);`);
  };
- m.customProgramCacheKey=()=>`terrain-${theme}-${quality}-r7`;return m;
+ m.customProgramCacheKey=()=>`terrain-${theme}-${quality}-r9`;return m;
 }
 export function addEnvironment(scene,track,quality=0){
  const ice=track.theme==='ice',city=track.theme==='city',land=terrainMaterial(track.theme,quality);
@@ -53,7 +54,7 @@ export function addEnvironment(scene,track,quality=0){
  for(const side of [-1,1]){
   const pos=[],uv=[],idx=[],allowed=[],columns=9,step=quality===0?3:quality===1?2:1;
   const samples=track.samples.filter((_,i)=>i%step===0);samples.push(samples[0]);
-  for(const p of samples)for(let j=0;j<columns;j++){const d=j*j*1.5,offset=p.width/2+d;const x=p.x+Math.cos(p.heading)*side*offset,z=p.z-Math.sin(p.heading)*side*offset,n=nearest(track,x,z);pos.push(x,height(p,d),z);uv.push(x*.075,z*.075);allowed.push(!onShortcut(track,x,z)&&n.distance>=n.point.width/2-.5);}
+  for(const p of samples)for(let j=0;j<columns;j++){const d=j*j*1.5,offset=p.width/2+d;const x=p.x+Math.cos(p.heading)*side*offset,z=p.z-Math.sin(p.heading)*side*offset,n=nearest(track,x,z);pos.push(x,height(p,Math.max(0,Math.min(d,n.distance-n.point.width/2))),z);uv.push(x*.075,z*.075);allowed.push(!onShortcut(track,x,z)&&n.distance>=n.point.width/2-.5);}
   for(let i=0;i<samples.length-1;i++)for(let j=0;j<columns-1;j++){const a=i*columns+j;for(const tri of [[a,a+columns,a+1],[a+1,a+columns,a+columns+1]]){if(!tri.every(v=>allowed[v]))continue;const x=tri.reduce((s,v)=>s+pos[v*3],0)/3,z=tri.reduce((s,v)=>s+pos[v*3+2],0)/3,n=nearest(track,x,z);if(n.distance>=n.point.width/2-.5&&!onShortcut(track,x,z))idx.push(...tri);}}
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setAttribute('uv1',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const mesh=new T.Mesh(g,land);mesh.receiveShadow=true;scene.add(mesh);
  }
@@ -85,7 +86,7 @@ export function addEnvironment(scene,track,quality=0){
  for(let area=0;area<5;area++){
   const center=track.samples[landmarkIndices[area]],group=new T.Group();group.userData.keep=true;group.userData.landmark=names[area];scene.add(group);
   let seed=area+17;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-  const placements=(count,near,spread,scale)=>Array.from({length:count},()=>{const anchor=track.samples[(landmarkIndices[area]+Math.floor((rand()-.5)*50)+track.samples.length)%track.samples.length],d=near+rand()*spread,side=area%2?1:-1;const p={x:anchor.x+Math.cos(anchor.heading)*side*(anchor.width/2+d),z:anchor.z-Math.sin(anchor.heading)*side*(anchor.width/2+d)};return {...p,y:height(anchor,d)-.4,slope:Math.abs(height(anchor,d+1)-height(anchor,d)),ry:rand()*Math.PI*2,scale:scale*(.7+rand()*.6)};}).filter(p=>!onShortcut(track,p.x,p.z)&&nearest(track,p.x,p.z).distance>center.width/2+2&&(near<13||p.y>.4));
+  const placements=(count,near,spread,scale)=>Array.from({length:count},()=>{const anchor=track.samples[(landmarkIndices[area]+Math.floor((rand()-.5)*50)+track.samples.length)%track.samples.length],d=near+rand()*spread,side=area%2?1:-1;const p={x:anchor.x+Math.cos(anchor.heading)*side*(anchor.width/2+d),z:anchor.z-Math.sin(anchor.heading)*side*(anchor.width/2+d)};const pn=nearest(track,p.x,p.z),dl=Math.max(0,Math.min(d,pn.distance-pn.point.width/2));return {...p,y:height(anchor,dl)-.4,slope:Math.abs(height(anchor,d+1)-height(anchor,d)),ry:rand()*Math.PI*2,scale:scale*(.7+rand()*.6)};}).filter(p=>!onShortcut(track,p.x,p.z)&&nearest(track,p.x,p.z).distance>center.width/2+2&&(near<13||p.y>.4));
   const rocks=placements(quality===0?3:7,9,25,ice?7:5);batch(group,'namaqualand_boulder_02',rocks);
   if(area===0||area===2)batch(group,ice?'namaqualand_cliff_01':'namaqualand_boulder_02',placements(1,34,8,ice?8:7));
   if(!city){batch(group,ice?'pine_sapling_small':'island_tree_01',placements(quality===0?0:10,25,36,ice?1.2:1));batch(group,'dead_tree_trunk',placements(1,14,12,1.5));if(!ice){batch(group,'fern_02',placements(quality===0?0:12,16,18,2));batch(group,'grass_medium_01',placements(quality===0?0:12,13,12,2));}}

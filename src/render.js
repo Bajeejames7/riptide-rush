@@ -242,7 +242,8 @@ export class Graphics {
     this.scene.fog = new T.Fog(track.sky, 420, 1800);
     const hemi = new T.HemisphereLight(
       theme === "tropic" ? 0xccefff : 0x7f9bff,
-      0x163a3b,
+      // Bounce light from the ground: keeps slopes facing away from the sun from going black.
+      theme === "tropic" ? 0x9a8a6c : theme === "ice" ? 0x7f8fa8 : 0x232a36,
       theme === "tropic" ? 1.3 : theme === "ice" ? .65 : .35,
     );
     this.scene.add(hemi);
