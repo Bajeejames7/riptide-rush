@@ -13,34 +13,32 @@ export function prepareImpostors(renderer,environment,quality,theme){
  }
 }
 const noise=(x,z)=>Math.sin(x*.027+Math.sin(z*.019)*2)*Math.cos(z*.023)+.4*Math.sin(x*.071+z*.049);
-function terrainMaterial(theme,quality){
- const m=surface(theme==='ice'?'snow':theme==='city'?'concrete':'sand');m.side=T.DoubleSide;
- const high=quality>=2?'hi_':'';
- const tex=n=>assets.textures.get(high+n)??assets.textures.get(n);
+export function terrainMaterial(theme,quality){
+ let m=surface(theme==='ice'?'snow':theme==='city'?'concrete':'sand');
+ if(quality===0){const source=m;m=new T.MeshLambertMaterial({color:source.color,map:source.map,normalMap:source.normalMap});source.dispose();}
+ m.side=T.DoubleSide;
+ // One diffuse and one normal on Low. No hidden PBR auxiliary samplers.
+ m.aoMap=null;m.roughnessMap=null;m.displacementMap=null;
+ m.normalScale.setScalar(theme==='ice'?.28:.65);
  m.onBeforeCompile=s=>{
-  Object.assign(s.uniforms,{landRock:{value:tex(theme==='ice'?'glacier_diff':'rock_diff')},landGrass:{value:tex(theme==='ice'?'ice_diff':theme==='city'?'asphalt_diff':'grass_diff')},landWet:{value:tex(theme==='ice'?'ice_diff':'wet_diff')},rockNormal:{value:tex(theme==='ice'?'glacier_nor_gl':'rock_nor_gl')},heightMap:{value:tex((theme==='ice'?'snow':'sand')+'_disp')}});
   s.vertexShader='varying vec3 landPosition,landNormal;\n'+s.vertexShader;
   s.vertexShader=s.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nlandPosition=(modelMatrix*vec4(transformed,1.)).xyz;landNormal=normalize(mat3(modelMatrix)*normal);');
-  s.fragmentShader='varying vec3 landPosition,landNormal;uniform sampler2D landRock,landGrass,landWet,rockNormal,heightMap;\n'+s.fragmentShader;
+  const prefix=quality>=2?'hi_':'';
+  s.uniforms.landRock={value:assets.textures.get(prefix+(theme==='ice'?'glacier':theme==='city'?'asphalt':'rock')+'_diff')};
+  s.fragmentShader='varying vec3 landPosition,landNormal;uniform sampler2D landRock;\n'+s.fragmentShader;
   s.fragmentShader=s.fragmentShader.replace('#include <map_fragment>',`
    vec2 landUV=landPosition.xz*.075;
-   ${quality>=2?'vec3 terrainView=normalize(cameraPosition-landPosition);landUV+=terrainView.xz/max(abs(terrainView.y),.25)*(texture2D(heightMap,landUV).r-.5)*.025;':''}
-   float steep=1.-abs(landNormal.y);float stone=smoothstep(.18,.6,steep);
-   float green=smoothstep(2.,8.,landPosition.y)*(1.-stone);
+   float macro=sin(landPosition.x*.031+sin(landPosition.z*.043)*2.);
+   float stone=smoothstep(.24,.62,1.-abs(normalize(landNormal).y)+macro*.055);
    vec3 ground=texture2D(map,landUV).rgb;
-   ground=mix(texture2D(landWet,landUV*.8).rgb*.64,ground,smoothstep(-.7,2.,landPosition.y));
-   ground=mix(ground,texture2D(landGrass,landUV*.77).rgb,green);
-   vec3 weights=pow(abs(landNormal),vec3(4.));weights/=max(dot(weights,vec3(1.)),.001);
-   vec3 stoneColor=texture2D(landRock,landPosition.yz*.065).rgb*weights.x+texture2D(landRock,landPosition.xz*.065).rgb*weights.y+texture2D(landRock,landPosition.xy*.065).rgb*weights.z;
-   ground=mix(ground,stoneColor,stone);ground*=.89+.11*sin(landPosition.x*.013+sin(landPosition.z*.017)*2.);
+   ${quality===0?"ground=mix(ground,ground*vec3(.44,.49,.55),stone);":"ground=mix(ground,texture2D(landRock,landUV*.87).rgb,stone);"}
+   ground*=.94+.06*macro;
+   ${theme==='ice'?"ground=mix(ground*.84,ground,smoothstep(-1.,2.,landPosition.y));":"ground*=mix(.65,1.,smoothstep(-.7,2.,landPosition.y));"}
    diffuseColor.rgb*=ground;
   `);
-  // Derivative normal mapping remains active on Low, using world-space UVs.
-  s.fragmentShader=s.fragmentShader.replace('#include <normal_fragment_maps>',`vec3 mapN=texture2D(normalMap,landUV).xyz*2.-1.;vec2 cliffUV=abs(landNormal.x)>abs(landNormal.z)?landPosition.zy*.065:landPosition.xy*.065;vec3 cliffN=texture2D(rockNormal,cliffUV).xyz*2.-1.;normal=normalize(mix(tbn*mapN,getTangentFrame(-vViewPosition,normal,cliffUV)*cliffN,stone));`);
-  s.fragmentShader=s.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>\n${theme==='ice'?'roughnessFactor=mix(.72,.18,green);roughnessFactor=mix(roughnessFactor,.9,stone);':'roughnessFactor*=mix(.25,1.,smoothstep(-.7,2.,landPosition.y));'}`);
-  s.fragmentShader=s.fragmentShader.replace('#include <fog_fragment>','#include <fog_fragment>\ngl_FragColor.rgb=mix(gl_FragColor.rgb,fogColor,(1.-exp(-distance(cameraPosition,landPosition)*.001))*exp(-max(landPosition.y,0.)*.075)*.22);');
+  s.fragmentShader=s.fragmentShader.replace('#include <normal_fragment_maps>',`vec3 mapN=texture2D(normalMap,landUV).xyz*2.-1.;mapN.xy*=normalScale;normal=normalize(getTangentFrame(-vViewPosition,normal,landUV)*mapN);`);
  };
- m.customProgramCacheKey=()=>`terrain-${theme}-${quality}`;return m;
+ m.customProgramCacheKey=()=>`terrain-${theme}-${quality}-r7`;return m;
 }
 export function addEnvironment(scene,track,quality=0){
  const ice=track.theme==='ice',city=track.theme==='city',land=terrainMaterial(track.theme,quality);
@@ -64,9 +62,10 @@ export function addEnvironment(scene,track,quality=0){
  if(!ice&&!city){
   let leaves;assets.models.get(`ph_fern_02_lod${lod}`)?.traverse(o=>{if(o.material?.map)leaves=o.material;});
   if(leaves){
+   if(quality===0)leaves=new T.MeshBasicMaterial({map:leaves.map,color:leaves.color,alphaTest:.45,side:T.DoubleSide,alphaToCoverage:true});
    const pos=[],uv=[],idx=[];for(let j=0;j<=12;j++)for(let k=0;k<=8;k++){const t=j/12,a=k/8*Math.PI*2,r=.45*(1-t)+.16;pos.push(Math.sin(t*1.3)*1.6+Math.cos(a)*r,t*12,Math.sin(a)*r);uv.push(k/8,t*4);}
    for(let j=0;j<12;j++)for(let k=0;k<8;k++){const a=j*9+k;idx.push(a,a+9,a+1,a+1,a+9,a+10);}const trunk=new T.BufferGeometry();trunk.setAttribute('position',new T.Float32BufferAttribute(pos,3));trunk.setAttribute('uv',new T.Float32BufferAttribute(uv,2));trunk.setIndex(idx);trunk.computeVertexNormals();
-   const cards=[];for(let k=0;k<9;k++){const g=new T.PlaneGeometry(2.2,6,1,5),a=g.attributes.position;for(let i=0;i<a.count;i++){const t=(a.getY(i)+3)/6;const radius=t*5;a.setXYZ(i,a.getX(i)*Math.sin(t*Math.PI)*1.1,12.2+Math.sin(t*Math.PI)*1.5-t*t*3,radius);}g.rotateY(k/9*Math.PI*2);g.translate(1.5,0,0);g.computeVertexNormals();cards.push(g);}const fronds=mergeGeometries(cards);cards.forEach(g=>g.dispose());
+   const cards=[];for(let k=0;k<(quality===0?4:9);k++){const g=new T.PlaneGeometry(2.2,6,1,5),a=g.attributes.position;for(let i=0;i<a.count;i++){const t=(a.getY(i)+3)/6;const radius=t*5;a.setXYZ(i,a.getX(i)*Math.sin(t*Math.PI)*1.1,12.2+Math.sin(t*Math.PI)*1.5-t*t*3,radius);}g.rotateY(k/(quality===0?4:9)*Math.PI*2);g.translate(1.5,0,0);g.computeVertexNormals();cards.push(g);}const fronds=mergeGeometries(cards);cards.forEach(g=>g.dispose());
    palm={trunk,fronds,bark:surface('bark'),leaves};
   }
  }
@@ -74,9 +73,9 @@ export function addEnvironment(scene,track,quality=0){
  const batch=(parent,name,placements)=>{
   const id=`ph_${name}_lod${lod}`;if(!assets.models.has(id)||!placements.length)return;
   const image=assets.textures.get(id+'_impostor_'+scene.environment?.uuid);
-  if(image){const near=new T.Group(),far=new T.Group();instanceModel(near,id,placements);const {width,height,center}=image.userData;
+  if(image){const near=new T.Group(),far=new T.Group();if(quality>0)instanceModel(near,id,placements);const {width,height,center}=image.userData;
    const a=new T.PlaneGeometry(width,height);a.translate(center.x,center.y,center.z);const b=a.clone().rotateY(Math.PI/2),g=mergeGeometries([a,b]);a.dispose();b.dispose();const m=new T.MeshBasicMaterial({map:image,alphaTest:.4,side:T.DoubleSide,alphaToCoverage:true});m.forceSinglePass=true;
-   const instances=new T.InstancedMesh(g,m,placements.length),d=new T.Object3D();placements.forEach((p,i)=>{d.position.set(p.x,p.y,p.z);d.rotation.y=p.ry;d.scale.setScalar(p.scale);d.updateMatrix();instances.setMatrixAt(i,d.matrix);});far.add(instances);parent.add(near,far);parent.userData.treeLods={near,far,distance:quality===0?140:240};
+   const instances=new T.InstancedMesh(g,m,placements.length),d=new T.Object3D();placements.forEach((p,i)=>{d.position.set(p.x,p.y,p.z);d.rotation.y=p.ry;d.scale.setScalar(p.scale);d.updateMatrix();instances.setMatrixAt(i,d.matrix);});far.add(instances);parent.add(near,far);parent.userData.treeLods={near,far,distance:quality===0?0:240};
   }else if(quality>=2&&assets.models.has(`ph_${name}_lod1`)){const near=new T.Group(),far=new T.Group();instanceModel(near,id,placements);instanceModel(far,`ph_${name}_lod1`,placements);parent.add(near,far);(parent.userData.objectLods??=[]).push({near,far,distance:180});}
   else instanceModel(parent,id,placements);
   contacts.push(...placements.map(p=>({...p,scale:p.scale*(name.includes('tree')?3:1.5)})));
@@ -86,10 +85,10 @@ export function addEnvironment(scene,track,quality=0){
  for(let area=0;area<5;area++){
   const center=track.samples[landmarkIndices[area]],group=new T.Group();group.userData.keep=true;group.userData.landmark=names[area];scene.add(group);
   let seed=area+17;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-  const placements=(count,near,spread,scale)=>Array.from({length:count},()=>{const anchor=track.samples[(landmarkIndices[area]+Math.floor((rand()-.5)*50)+track.samples.length)%track.samples.length],d=near+rand()*spread,side=area%2?1:-1;const p={x:anchor.x+Math.cos(anchor.heading)*side*(anchor.width/2+d),z:anchor.z-Math.sin(anchor.heading)*side*(anchor.width/2+d)};return {...p,y:height(anchor,d)-.4,slope:Math.abs(height(anchor,d+1)-height(anchor,d)),ry:rand()*Math.PI*2,scale:scale*(.7+rand()*.6)};}).filter(p=>!onShortcut(track,p.x,p.z)&&nearest(track,p.x,p.z).distance>center.width/2+2&&(near<13||(p.y>.4&&p.slope<.8)));
+  const placements=(count,near,spread,scale)=>Array.from({length:count},()=>{const anchor=track.samples[(landmarkIndices[area]+Math.floor((rand()-.5)*50)+track.samples.length)%track.samples.length],d=near+rand()*spread,side=area%2?1:-1;const p={x:anchor.x+Math.cos(anchor.heading)*side*(anchor.width/2+d),z:anchor.z-Math.sin(anchor.heading)*side*(anchor.width/2+d)};return {...p,y:height(anchor,d)-.4,slope:Math.abs(height(anchor,d+1)-height(anchor,d)),ry:rand()*Math.PI*2,scale:scale*(.7+rand()*.6)};}).filter(p=>!onShortcut(track,p.x,p.z)&&nearest(track,p.x,p.z).distance>center.width/2+2&&(near<13||p.y>.4));
   const rocks=placements(quality===0?3:7,9,25,ice?7:5);batch(group,'namaqualand_boulder_02',rocks);
-  if(area===0||area===2)batch(group,'namaqualand_cliff_01',placements(1,34,8,ice?15:10));
-  if(!city){batch(group,ice?'pine_sapling_small':'island_tree_01',placements(quality===0?4:10,25,36,ice?1.2:1));batch(group,'dead_tree_trunk',placements(1,14,12,1.5));if(!ice){batch(group,'fern_02',placements(quality===0?3:12,16,18,2));batch(group,'grass_medium_01',placements(quality===0?3:12,13,12,2));}}
+  if(area===0||area===2)batch(group,ice?'namaqualand_cliff_01':'namaqualand_boulder_02',placements(1,34,8,ice?8:7));
+  if(!city){batch(group,ice?'pine_sapling_small':'island_tree_01',placements(quality===0?0:10,25,36,ice?1.2:1));batch(group,'dead_tree_trunk',placements(1,14,12,1.5));if(!ice){batch(group,'fern_02',placements(quality===0?0:12,16,18,2));batch(group,'grass_medium_01',placements(quality===0?0:12,13,12,2));}}
   if(palm){const sites=placements(quality===0?2:4,16,15,1);for(const [geo,material] of [[palm.trunk,palm.bark],[palm.fronds,palm.leaves]]){const mesh=new T.InstancedMesh(geo,material,sites.length),d=new T.Object3D();sites.forEach((p,i)=>{d.position.set(p.x,p.y,p.z);d.rotation.y=p.ry;d.scale.setScalar(p.scale);d.updateMatrix();mesh.setMatrixAt(i,d.matrix);});mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);}}
   if(!ice&&!city)batch(group,'shrub_01',placements(quality===0?2:6,23,15,2));
   if(city||area===1||area===3){batch(group,'modular_wooden_pier',placements(1,3,0,2));batch(group,'wooden_crate_01',placements(2,12,5,1.5));batch(group,'Barrel_01',placements(2,14,3,1.5));batch(group,'street_lamp_01',placements(1,10,0,1.6));}
@@ -100,7 +99,21 @@ export function addEnvironment(scene,track,quality=0){
   if(ice&&(area===0||area===4)){const arch=new T.Mesh(new T.TorusGeometry(center.width*.65,6,6,24,Math.PI),surface('ice'));arch.position.set(center.x,8,center.z);arch.rotation.y=center.heading;arch.castShadow=arch.receiveShadow=true;group.add(arch);}
   if(!ice&&!city&&area===0){const p=placements(1,34,0,1)[0];if(p){const tower=new T.Mesh(new T.CylinderGeometry(2.2,3.5,23,20),surface('concrete'));tower.position.set(p.x,p.y+11.5,p.z);group.add(tower);const lantern=new T.Mesh(new T.CylinderGeometry(2.5,2.5,2,16),new T.MeshPhysicalMaterial({color:0xd5e0dc,metalness:.5,roughness:.15,emissive:0xffd28b,emissiveIntensity:.35}));lantern.position.set(p.x,p.y+24,p.z);group.add(lantern);}}
   // Distance culling is evaluated per viewport, preserving split-screen visibility.
-  group.userData.sceneryCenter=new T.Vector3(center.x,0,center.z);group.userData.sceneryDistance=quality===0?340:quality===1?480:800;
+  group.userData.sceneryCenter=new T.Vector3(center.x,0,center.z);group.userData.sceneryDistance=quality===0?650:quality===1?700:800;
+ }
+ // Both banks, including the start straight. Each cluster has its own culling bound.
+ if(!city)for(let sector=0;sector<5;sector++){
+  const group=new T.Group();group.userData.keep=true;const trees=[],rocks=[],shrubs=[];
+  const begin=Math.floor(sector*track.samples.length/5),end=Math.floor((sector+1)*track.samples.length/5);
+  for(let i=begin;i<end;i+=65)for(const side of [-1,1]){
+   const anchor=track.samples[i];
+   for(const [k,d] of [7,17,29].entries()){
+    const p={x:anchor.x+Math.cos(anchor.heading)*side*(anchor.width/2+d),z:anchor.z-Math.sin(anchor.heading)*side*(anchor.width/2+d),y:height(anchor,d)-.15,ry:i*.73+k,scale:k===0?(ice?3:2.8):k===1?(ice?1.8:2.2):1.6};
+    if(p.y>-.5&&!onShortcut(track,p.x,p.z)&&nearest(track,p.x,p.z).distance>=anchor.width/2+3)(k===0?rocks:k===1?trees:shrubs).push(p);
+   }
+  }
+  batch(group,'namaqualand_boulder_02',rocks);batch(group,ice?'pine_sapling_small':'island_tree_01',trees);batch(group,ice?'dead_tree_trunk':'shrub_01',shrubs);
+  const anchor=track.samples[Math.floor((begin+end)/2)];group.userData.sceneryCenter=new T.Vector3(anchor.x,0,anchor.z);group.userData.sceneryDistance=700;scene.add(group);
  }
  // Photo-textured waterfront warehouses, with restrained lit window rows at night.
  if(city){const brick=surface('brick'),metal=surface('metal');brick.onBeforeCompile=s=>{
@@ -110,8 +123,17 @@ export function addEnvironment(scene,track,quality=0){
   for(let i=0;i<10;i++){const p=track.samples[Math.floor(i/10*track.samples.length)],height=14+i%3*8,geometry=new T.BoxGeometry(22,height,18),uv=geometry.attributes.uv;for(let k=0;k<uv.count;k++)uv.setXY(k,uv.getX(k)*4,uv.getY(k)*2);
    const building=new T.Group();building.position.set(p.x+Math.cos(p.heading)*(p.width/2+45),5,p.z-Math.sin(p.heading)*(p.width/2+45));building.rotation.y=p.heading;scene.add(building);
    const wall=new T.Mesh(geometry,i%3?brick:metal);wall.position.y=height/2;wall.castShadow=wall.receiveShadow=true;building.add(wall);
-   for(const side of [-1,1]){const roof=new T.Mesh(new T.PlaneGeometry(24,11),metal);roof.rotation.x=-Math.PI/2+side*.42;roof.position.set(0,height+2,side*4.5);roof.castShadow=roof.receiveShadow=true;building.add(roof);}
+   const base=new T.Mesh(new T.BoxGeometry(26,6,22),surface('concrete'));base.position.y=-1;building.add(base);
+   const roof=new T.Mesh(new T.BoxGeometry(24,1.2,20),metal);roof.position.y=height+.6;building.add(roof);
+   const annex=new T.Mesh(new T.BoxGeometry(10,7+i%3*2,12),brick);annex.position.set(i%2?15:-15,4,1);building.add(annex);
+   for(const x of [-9,0,9]){const pilaster=new T.Mesh(new T.BoxGeometry(.65,height,1),metal);pilaster.position.set(x,height/2,-9.3);building.add(pilaster);}
+
   }}
+ if(city){const edge=surface('concrete',0xb5bdc1),count=Math.ceil(track.samples.length/3)*2,curbs=new T.InstancedMesh(new T.BoxGeometry(2,2.2,1),edge,count),dummy=new T.Object3D();let n=0;
+  for(let i=0;i<track.samples.length;i+=3){const p=track.samples[i],q=track.samples[(i+3)%track.samples.length];for(const side of [-1,1]){const x=p.x+Math.cos(p.heading)*side*(p.width/2+1.5),z=p.z-Math.sin(p.heading)*side*(p.width/2+1.5),xx=q.x+Math.cos(q.heading)*side*(q.width/2+1.5),zz=q.z-Math.sin(q.heading)*side*(q.width/2+1.5);dummy.position.set((x+xx)/2,.1,(z+zz)/2);dummy.rotation.y=Math.atan2(xx-x,zz-z);dummy.scale.set(1,1,Math.hypot(xx-x,zz-z)+.3);dummy.updateMatrix();curbs.setMatrixAt(n++,dummy.matrix);}}
+  curbs.castShadow=curbs.receiveShadow=true;scene.add(curbs);
+ }
+
  // Channel edge markers and shortcut signs retain strong arcade contrast.
  const markerMat=new T.MeshStandardMaterial({color:0x68ccb9,emissive:0x15483d});const sites=track.samples.filter((_,i)=>i%20===0),markers=new T.InstancedMesh(new T.CylinderGeometry(.3,.5,1.7,6),markerMat,sites.length*2),dummy=new T.Object3D();let n=0;
  for(const p of sites)for(const side of [-1,1]){dummy.position.set(p.x+Math.cos(p.heading)*side*(p.width/2-1),.7,p.z-Math.sin(p.heading)*side*(p.width/2-1));dummy.updateMatrix();markers.setMatrixAt(n++,dummy.matrix);}scene.add(markers);

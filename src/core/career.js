@@ -1,7 +1,7 @@
 // Career data and deterministic event rules: no DOM or renderer dependencies.
 export const SAVE_KEY='rr.career.v1';
 export const TYPES=['Race','Time Trial','Elimination','Checkpoint Rush','Boost Hunt','Duel'];
-export const PAINTS=['#ff633a','#39e7e2','#ffd552','#b79aff','#66e882','#ef69cd'];
+export const PAINTS=['#ba1028','#174acb','#efbd08','#6224b5','#08763b','#e95108','#10151e','#ffffff'];
 export const RIVALS=[
  {name:'Marina Flint',boat:2,color:PAINTS[2],personality:'Fearless harbour veteran',taunt:'The tide waits for nobody. Keep up.'},
  {name:'Ivo Frost',boat:3,color:PAINTS[3],personality:'Precise ice navigator',taunt:'One wide turn is all I need.'},
@@ -17,7 +17,7 @@ export const EVENTS=TIERS.flatMap((_,tier)=>Array.from({length:7},(_,n)=>{
 }));
 export const freshSave=()=>({version:1,stars:{},reputation:0,defeated:[],boat:0,paint:PAINTS[0],upgrades:{}});
 export const totalStars=s=>Object.values(s.stars).reduce((a,b)=>a+b,0);
-export function unlocked(s){const stars=totalStars(s);return {boats:[0,1,...[2,3,4,5].filter((b,i)=>stars>=[15,32,52,72][i]||s.defeated.includes(i))],tracks:[0,...[1,2].filter((t,i)=>stars>=[10,26][i])],paints:[...PAINTS.slice(0,Math.min(6,2+Math.floor(s.reputation/400))),...(s.defeated.includes(4)?['#ffffff']:[])],upgradeLevel:s.defeated.includes(4)?3:Math.min(3,Math.floor(stars/12),Math.floor(s.reputation/250))};}
+export function unlocked(s){const stars=totalStars(s);return {boats:[0,1,...[2,3,4,5].filter((b,i)=>stars>=[15,32,52,72][i]||s.defeated.includes(i))],tracks:[0,...[1,2].filter((t,i)=>stars>=[10,26][i])],paints:[...PAINTS.slice(0,Math.min(PAINTS.length,2+Math.floor(s.reputation/400))),...(s.defeated.includes(4)?['#ffffff']:[])],upgradeLevel:s.defeated.includes(4)?3:Math.min(3,Math.floor(stars/12),Math.floor(s.reputation/250))};}
 export function canEnter(s,e){return totalStars(s)>=e.gate&&(e.tier===0||s.defeated.includes(e.tier-1));}
 export function loadSlots(storage){try{const a=JSON.parse(storage.getItem(SAVE_KEY));if(!Array.isArray(a))throw Error();return Array.from({length:3},(_,i)=>a[i]?.version===1?{...freshSave(),...a[i]}:freshSave());}catch{return Array.from({length:3},freshSave);}}
 export function saveSlots(storage,slots){storage.setItem(SAVE_KEY,JSON.stringify(slots));}

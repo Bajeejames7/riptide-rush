@@ -13,6 +13,14 @@ import { nearest } from "./core/tracks.js";
 import {wave} from './core/physics.js';
 import { waterVertex, waterFragment } from "./water.js";
 import {assets,model,surface,mergeStatic,skyLighting} from './assets.js';
+// Downsample radiance without canvas conversion (keeps HDR half floats intact).
+function compactSky(source,width=1024,aurora=false){
+ const src=source.image,w=Math.min(width,src.width),h=Math.round(src.height*w/src.width),data=new src.data.constructor(w*h*4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=(Math.floor(y*src.height/h)*src.width+Math.floor(x*src.width/w))*4,b=(y*w+x)*4;for(let c=0;c<4;c++)data[b+c]=src.data[a+c];
+  if(aurora&&y<h*.43){for(let c=0;c<3;c++){let v=source.type===T.HalfFloatType?T.DataUtils.fromHalfFloat(data[b+c]):data[b+c];v=Math.min(v,1.4)*[.28,.75,.58][c];data[b+c]=source.type===T.HalfFloatType?T.DataUtils.toHalfFloat(v):v;}}
+ }
+ const t=new T.DataTexture(data,w,h,source.format,source.type);t.mapping=T.EquirectangularReflectionMapping;t.flipY=source.flipY;t.minFilter=T.LinearFilter;t.magFilter=T.LinearFilter;t.colorSpace=source.colorSpace;t.needsUpdate=true;t.userData.shared=true;return t;
+}
 const tmp = new T.Vector3();
 let palette=new Map();
 function material(color, metalness = 0.2, roughness = 0.35) {
@@ -35,6 +43,7 @@ function boatSource(type,quality){
  const source=model(id);source.updateMatrixWorld(true);const buckets=new Map(),lowMaterials=new Map();
  let paletteMaterial;source.traverse(o=>{if(o.material?.name==='PaletteMaterial003')paletteMaterial=o.material;});
  const materialFor=original=>{
+  if(/^(Windows|Seats|BoatFloor)$/.test(original.name)){if(!lowMaterials.has(original)){const dark=original.clone();dark.color.multiplyScalar(.3);dark.userData={...dark.userData,shared:true};dark.forceSinglePass=true;lowMaterials.set(original,dark);}return lowMaterials.get(original);}
   if(quality!==0){original.forceSinglePass=true;return original;}
   // Cabin palette variants share the same colour texture; Low uses one opaque palette pass.
   if(type===2&&/^PaletteMaterial00[123]$/.test(original.name))original=paletteMaterial;
@@ -48,7 +57,9 @@ export function buildBoat(type,color,number=type+1,quality=2) {
  const hull=boatSource(type,quality).clone(true);g.add(hull);
  const bounds=new T.Box3().setFromObject(hull),size=bounds.getSize(new T.Vector3());
  g.userData.dimensions={width:size.x,height:size.y,length:size.z,stern:bounds.min.z,bow:bounds.max.z};
- const paints=new Map();hull.traverse(o=>{if(!o.isMesh||o.material.name!=='paint')return;const original=o.material;if(!paints.has(original)){const paint=new T.MeshPhysicalMaterial();T.MeshStandardMaterial.prototype.copy.call(paint,original);paint.defines.PHYSICAL='';paint.clearcoat=1;paint.clearcoatRoughness=.09;paint.map=null;paint.userData={...paint.userData,shared:false};paint.color.set(color);paint.metalness=.18;paint.roughness=.19;paint.envMapIntensity=1.25;paints.set(original,paint);}o.material=paints.get(original);});
+ const paints=new Map();hull.traverse(o=>{if(!o.isMesh||o.material.name!=='paint')return;const original=o.material;if(!paints.has(original)){const paint=new T.MeshPhysicalMaterial();T.MeshStandardMaterial.prototype.copy.call(paint,original);paint.defines.PHYSICAL='';paint.clearcoat=1;paint.clearcoatRoughness=.09;paint.map=null;paint.userData={...paint.userData,shared:false};paint.color.set(color);paint.metalness=.4;paint.roughness=.3;paint.envMapIntensity=.85;
+ if(type===4){paint.onBeforeCompile=shader=>{shader.vertexShader='varying float paintShade;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\npaintShade=mix(.16,1.,smoothstep(-.15,.55,normal.y))*mix(.45,1.,smoothstep(-.2,1.2,position.y));');shader.fragmentShader='varying float paintShade;\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=paintShade;');};paint.customProgramCacheKey=()=> 'cyberpunk-contrast-r7';}
+ paints.set(original,paint);}o.material=paints.get(original);});
  if(!paints.size){const accent=mesh(new T.BoxGeometry(size.x*.8,.09,.12),new T.MeshBasicMaterial({color,toneMapped:false}),g,0,Math.max(.25,bounds.max.y*.65),bounds.min.z+.25);accent.castShadow=false;}
  const flame=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0x77ccff,blending:T.AdditiveBlending,transparent:true,depthWrite:false,toneMapped:false}));flame.position.set(0,.2,bounds.min.z-.35);flame.scale.set(size.x*.7,2,1);flame.name='flame';flame.visible=false;g.add(flame);
  return g;
@@ -125,6 +136,9 @@ export class Graphics {
     this.blitScene=new T.Scene();this.blitCamera=new T.OrthographicCamera(-1,1,1,-1,0,1);
     this.blitMaterial=new T.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{tDiffuse:{value:null}},vertexShader:"varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}",fragmentShader:"uniform sampler2D tDiffuse;varying vec2 v;void main(){gl_FragColor=texture2D(tDiffuse,v);}"});
     this.blitScene.add(new T.Mesh(new T.PlaneGeometry(2,2),this.blitMaterial));
+    if(new URLSearchParams(location.search).get('perf')==='1'){
+      this.perfOverlay=document.createElement('pre');this.perfOverlay.id='perf';this.perfOverlay.style.cssText='position:fixed;left:8px;bottom:8px;z-index:1000;background:#001c;color:#aef;padding:8px;font:12px monospace;pointer-events:none';document.body.append(this.perfOverlay);
+    }
     this.resize();
     window.addEventListener("resize", () => this.resize());
   }
@@ -247,7 +261,11 @@ export class Graphics {
     sun.shadow.normalBias = 0.05;
     this.scene.add(sun);
     this.scene.add(sun.target);this.sun=sun;
-    const hdri=assets.skies.get(theme);this.scene.background=hdri;
+    const fullSky=assets.skies.get(theme);this.compactSkies??=new Map();
+    const skyKey=theme+'/'+(this.settings.quality===0?'low':'full');
+    if(!this.compactSkies.has(skyKey))this.compactSkies.set(skyKey,this.settings.quality===0?compactSky(fullSky):fullSky);
+    const hdri=this.compactSkies.get(skyKey);
+    if(theme==='ice'){if(!this.compactSkies.has('aurora'))this.compactSkies.set('aurora',compactSky(fullSky,1024,true));this.scene.background=this.compactSkies.get('aurora');}else this.scene.background=hdri;
     this.scene.backgroundIntensity=theme==='city'?.55:.85;
     const lighting=skyLighting(hdri);this.scene.fog=new T.Fog(lighting.horizon.multiplyScalar(this.scene.backgroundIntensity),330,1450);
     this.renderer.toneMappingExposure=track.variant==='sunset'?.7:track.variant==='rain'?.65:({tropic:.85,ice:1.05,city:.9}[theme]);
@@ -258,7 +276,7 @@ export class Graphics {
     this.sunOffset=lighting.direction.multiplyScalar(260);sun.position.copy(this.sunOffset);
     this.reflectionTarget?.dispose();this.reflectionTarget=new T.WebGLCubeRenderTarget(128,{type:T.HalfFloatType});
     const skyScene=new T.Scene();skyScene.background=hdri;new T.CubeCamera(.5,2100,this.reflectionTarget).update(this.renderer,skyScene);
-    this.environments??=new Map();if(!this.environments.has(theme)){const pmrem=new T.PMREMGenerator(this.renderer);this.environments.set(theme,pmrem.fromEquirectangular(hdri));pmrem.dispose();}this.environment=this.environments.get(theme);this.scene.environment=this.environment.texture;
+    this.environments??=new Map();if(!this.environments.has(skyKey)){const pmrem=new T.PMREMGenerator(this.renderer);const input=this.settings.quality===0?compactSky(hdri,256):hdri;this.environments.set(skyKey,pmrem.fromEquirectangular(input));if(input!==hdri)input.dispose();pmrem.dispose();}this.environment=this.environments.get(skyKey);this.scene.environment=this.environment.texture;
     if(!this.sprayMask){const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),gradient=ctx.createRadialGradient(32,32,0,32,32,32);gradient.addColorStop(0,'rgba(255,255,255,1)');gradient.addColorStop(.3,'rgba(255,255,255,.8)');gradient.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64);this.sprayMask=new T.CanvasTexture(c);this.sprayMask.userData.shared=true;}this.particleMesh.material.map=this.sprayMask;this.particleMesh.material.needsUpdate=true;
     this.waterUniforms = {
       fogColor:{value:this.scene.fog.color},fogNear:{value:this.scene.fog.near},fogFar:{value:this.scene.fog.far},
@@ -289,7 +307,7 @@ export class Graphics {
     const waterMat = new T.ShaderMaterial({
       uniforms: this.waterUniforms,
       vertexShader: waterVertex,
-      fragmentShader: '#define WAKE_COUNT '+([12,24,64,64][this.settings.quality])+'\n'+waterFragment,
+      fragmentShader: (this.settings.quality===0?'#define LOW_WATER\n':'')+'#define WAKE_COUNT '+([8,24,64,64][this.settings.quality])+'\n'+waterFragment,
     });
     const waterGeo = new T.PlaneGeometry(
       2600,
@@ -599,6 +617,14 @@ export class Graphics {
         Object.assign(this.sun.shadow.camera,{left:-65,right:65,top:65,bottom:-65});this.sun.shadow.camera.updateProjectionMatrix();
       }
       this.scene.traverse(o=>{if(o.userData.sceneryCenter){const distance=c.position.distanceTo(o.userData.sceneryCenter);o.visible=distance<o.userData.sceneryDistance;for(const lod of [...(o.userData.objectLods??[]),...(o.userData.treeLods?[o.userData.treeLods]:[])]){lod.near.visible=distance<lod.distance;lod.far.visible=!lod.near.visible;}}});
+      // Opaque alpha-test cards write depth. Sort instances too, not just draw objects.
+      if(this.settings.quality===0)this.scene.traverse(o=>{
+        if(!o.isInstancedMesh||!o.material.alphaTest||!o.visible)return;
+        if(!o.userData.sortedInstances){const matrix=new T.Matrix4(),color=new T.Color();o.userData.sortedInstances=Array.from({length:o.count},(_,i)=>{o.getMatrixAt(i,matrix);if(o.instanceColor)o.getColorAt(i,color);return {matrix:matrix.clone(),color:color.clone(),distance:0};});}
+        const entries=o.userData.sortedInstances;
+        for(const entry of entries){tmp.setFromMatrixPosition(entry.matrix).applyMatrix4(o.matrixWorld);entry.distance=tmp.distanceToSquared(c.position);}
+        entries.sort((a,b)=>a.distance-b.distance);entries.forEach((entry,i)=>{o.setMatrixAt(i,entry.matrix);if(o.instanceColor)o.setColorAt(i,entry.color);});o.instanceMatrix.needsUpdate=true;if(o.instanceColor)o.instanceColor.needsUpdate=true;
+      });
       if(this.settings.quality===0){r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);r.render(this.scene,c);const stats={calls:r.info.render.calls,triangles:r.info.render.triangles};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);continue;}
       r.setScissorTest(false);
       if(this.postWidth!==w||this.postHeight!==h){this.composer.setSize(w,h);this.postWidth=w;this.postHeight=h;}
@@ -612,13 +638,14 @@ export class Graphics {
         this.planar.onBeforeRender(r,this.scene,c);this.water.visible=true;this.waterUniforms.screenSize.value.set(w*r.getPixelRatio(),h*r.getPixelRatio());
       }
       this.composer.render();
-      const stats={calls:r.info.render.calls,triangles:r.info.render.triangles};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);
+      const stats={calls:r.info.render.calls+1,triangles:r.info.render.triangles+2};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);
       r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);
       this.blitMaterial.uniforms.tDiffuse.value=this.composer.readBuffer.texture;
       r.autoClear=false;r.render(this.blitScene,this.blitCamera);r.autoClear=true;
       r.info.autoReset=true;
     }
     r.setScissorTest(false);
+    if(this.perfOverlay){const low=this.settings.quality===0,advanced=this.settings.quality>=2;this.perfOverlay.textContent=`${this.track.name} | tier ${this.settings.quality} | dyn ${(this.dyn??1).toFixed(2)} | ${(1/Math.max(dt,.001)).toFixed(0)} fps\ncalls ${this.frameStats.views.reduce((n,v)=>n+v.calls,0)} | triangles ${this.frameStats.views.reduce((n,v)=>n+v.triangles,0)}\nterrain planar ${low?'1 diffuse + 1 normal':'2 diffuse + 1 normal'} | water ${low?'2 normal + env':'2 normal + shore + foam + env'}\nshadows ${!low} | depth/refraction/planar ${advanced} | SSAO ${advanced} | bloom/post ${!low} | SSR/parallax/triplanar false | foliage ${low?'LOD1/impostor':'LOD + impostor'}`;}
   }
 }
 function whiteMaterial() {

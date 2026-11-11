@@ -43,10 +43,10 @@ let screen = "home",
   joinLatch = new Set(),
   toastTimer;
 let choices = [
-  { name: "Skipper 1", type: 0, color: "#ff633a" },
-  { name: "Skipper 2", type: 1, color: "#39e7e2" },
-  { name: "Skipper 3", type: 2, color: "#b79aff" },
-  { name: "Skipper 4", type: 3, color: "#ffd552" },
+  { name: "Skipper 1", type: 0, color: "#ba1028" },
+  { name: "Skipper 2", type: 1, color: "#174acb" },
+  { name: "Skipper 3", type: 2, color: "#6224b5" },
+  { name: "Skipper 4", type: 3, color: "#efbd08" },
 ];
 const input = new Input((id) => {
     if (screen === "race") {
@@ -58,7 +58,7 @@ let slots=loadSlots(localStorage), slot=Math.max(0,Math.min(2,settings.careerSlo
 const careerSave=()=>slots[slot];
 const persistCareer=()=>saveSlots(localStorage,slots);
 const content=()=>settings.partyPlay?{boats:[0,1,2,3,4,5],tracks:[0,1,2]}:unlocked(careerSave());
-function paintControl(attributes,color){const paints=settings.partyPlay?[...PAINTS,'#ffffff']:unlocked(careerSave()).paints;return '<select '+attributes+'>'+paints.map((p,i)=>'<option value="'+p+'" '+(p===color?'selected':'')+'>Paint '+(i+1)+' / '+p+'</option>').join('')+'</select>';}
+function paintControl(attributes,color){const paints=settings.partyPlay?PAINTS:unlocked(careerSave()).paints;return '<select '+attributes+'>'+paints.map((p,i)=>'<option value="'+p+'" '+(p===color?'selected':'')+'>Paint '+(i+1)+' / '+p+'</option>').join('')+'</select>';}
 function normalizeChoices(){for(const c of choices)if(!settings.partyPlay&&!unlocked(careerSave()).paints.includes(c.color))c.color=PAINTS[0];for(const c of choices)if(!content().boats.includes(c.type))c.type=0;if(!content().tracks.includes(config.track))config.track=0;}
 function careerMap(tier=0){
  screen='career';careerEvent=null;eventState=null;normalizeChoices();
