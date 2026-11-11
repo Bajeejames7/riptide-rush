@@ -7,5 +7,6 @@ release/
 *.log
 .chrome-test/
 .chrome-round4/
+.chrome-round6/
 artifacts/
 assets-src/

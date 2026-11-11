@@ -29,6 +29,7 @@ test('all six mapped boats have credited, bounded, self-contained shipped models
   assert.ok(tris*8<=100000);assert.ok(calls*8<=100);
   const am=[],bm=[];a.children[0].traverse(o=>{if(o.isMesh)am.push(o);});b.children[0].traverse(o=>{if(o.isMesh)bm.push(o);});
   am.forEach((o,i)=>{assert.equal(o.geometry,bm[i].geometry);if(o.material.name==='paint'){assert.notEqual(o.material,bm[i].material);assert.equal(o.material.color.getHexString(),'ff0000');assert.equal(bm[i].material.color.getHexString(),'00ff00');}else assert.equal(o.material,bm[i].material);});
+  for(const mesh of am)if(mesh.material.name==='paint'){assert.equal(mesh.material.isMeshPhysicalMaterial,true);assert.ok('PHYSICAL' in mesh.material.defines);assert.equal(mesh.material.clearcoat,1);assert.equal(mesh.material.map,null);}
   assert.ok(Math.abs(a.userData.dimensions.length-8)<.02);assert.ok(Math.abs(a.userData.dimensions.width-boatDimensions(type).width)<.02);
   assert.ok(a.getObjectByName('flame').position.z<a.userData.dimensions.stern);
   assert.equal(contactRadius({type,heading:0},0,1),4);assert.equal(contactRadius({type,heading:0},1,0),boatDimensions(type).radius);

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
-import {assets,preloadAssets,skyLighting,mergeStatic} from '../src/assets.js';
+import {assets,preloadAssets,skyLighting,mergeStatic,releaseEnvironmentTier} from '../src/assets.js';
 
 test('asset loading reports failure, retries, tracks progress and caches concurrent requests without binary fixtures',async()=>{
  const originalFetch=globalThis.fetch,originals=[GLTFLoader.prototype.loadAsync,HDRLoader.prototype.loadAsync,T.TextureLoader.prototype.loadAsync];
@@ -26,6 +26,16 @@ test('static batching preserves instance and animated objects; HDR light follows
  const animated=new T.Mesh(new T.BoxGeometry(),material);animated.userData.keep=true;scene.add(animated);mergeStatic(scene);assert.equal(scene.children.length,2);assert.ok(scene.children.includes(animated));
  const data=new Float32Array(8*4*4).fill(.2);data[(0*8+2)*4]=100;
  const lighting=skyLighting({image:{data,width:8,height:4},type:T.FloatType});assert.ok(lighting.direction.y>0);assert.ok(Number.isFinite(lighting.horizon.r));assert.ok(Math.abs(lighting.direction.length()-1)<1e-6);
+});
+
+test('returning to Low releases High model and texture resources while preserving Low sources',()=>{
+ const high=new T.Texture(),low=new T.Texture();let disposed=0,closed=0;high.image={close(){closed++;}};high.addEventListener('dispose',()=>disposed++);
+ const make=t=>{const g=new T.Group();g.add(new T.Mesh(new T.BoxGeometry(),new T.MeshStandardMaterial({map:t})));return g;};
+ const lowSource=make(low);assets.models.set('ph_memory_lod0',make(high));assets.models.set('ph_memory_lod1',lowSource);assets.textures.set('hi_memory_diff',high);assets.textures.set('memory_diff',low);
+ releaseEnvironmentTier(0);
+ assert.equal(assets.models.has('ph_memory_lod0'),false);assert.equal(assets.textures.has('hi_memory_diff'),false);assert.equal(disposed,1);assert.equal(closed,1);
+ assert.equal(assets.models.get('ph_memory_lod1'),lowSource);assert.equal(assets.textures.get('memory_diff'),low);
+ assets.models.delete('ph_memory_lod1');assets.textures.delete('memory_diff');lowSource.children[0].geometry.dispose();lowSource.children[0].material.dispose();low.dispose();
 });
 
 

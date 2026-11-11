@@ -1,110 +1,90 @@
 # Bundled art assets
 
-The bundled scenery, textures and particles are CC0; the six Sketchfab racing boats are CC BY 4.0 or CC BY-NC 4.0 as listed below. No downloaded code, scripts, executables or editor projects were executed. Original race names, layouts, physics, UI and audio remain project content.
+Round 6 replaces all Kenney scenery with CC0 Poly Haven assets and original textured geometry. The six existing Sketchfab racing boats retain their individual licences. Kenney Particle Pack sprites remain CC0. No downloaded code, executables, scripts, Blender files or editor projects were executed.
 
-## Downloaded packs
+## Acquisition and preparation
 
-| Pack | Source / licence | Archive download bytes |
-| --- | --- | ---: |
-| watercraft-kit | [watercraft-kit](https://kenney.nl/assets/watercraft-kit) — CC0 (included licence text) | 1,870,991 |
-| pirate-kit | [pirate-kit](https://kenney.nl/assets/pirate-kit) — CC0 (included licence text) | 3,154,665 |
-| city-kit-commercial | [city-kit-commercial](https://kenney.nl/assets/city-kit-commercial) — CC0 (included licence text) | 4,096,974 |
-| particle-pack | [particle-pack](https://kenney.nl/assets/particle-pack) — CC0 (included licence text) | 832,962 |
+New round 6 data came only from `api.polyhaven.com` and `dl.polyhaven.org`. The model and texture catalogues were queried and selections checked against their categories/tags. Raw glTF, BIN, JPG/PNG files and provenance stay in ignored `assets-src/polyhaven/`; runtime assets are self-contained GLBs, JPEG textures and existing HDRIs in `public/assets/`. Nothing is fetched from the internet by the game.
 
-Kenney uses short-lived signed download URLs. The fetch script obtains them from its own `/download-link/` endpoint with a same-site session. The previous `/media/pages/...zip` URLs redirected to HTML; the signed endpoints delivered the archives. Exact resolved URLs and byte counts are kept in ignored `assets-src/<pack>/download.json`.
+`python scripts/fetch-polyhaven.py --environment` reuses cached downloads and records source URLs in `selection.json`, `round6-download.json`, `texture-download.json` and `alpha-download.json`. `node scripts/prepare-environment.mjs` prepares missing models one at a time in separate bounded-memory child processes (dedup, weld, simplify, prune, texture resize/WebP). Existing GLBs are retained unless `--force` is explicit. `node scripts/repair-environment.mjs` repairs cached shipped GLBs one at a time, combines separately supplied foliage alpha masks, grounds origins, reduces the Low harbour ship and refreshes metadata without reading the huge raw tree scans. `--textures-only` repacks cached terrain maps. Sharp uses one thread and no persistent cache.
 
-## Selected models
+Foliage masks are merged as a single alpha channel before WebP encoding, checked by the asset audit, alpha-tested with mipmaps and alpha-to-coverage on the MSAA path. High/Ultra use LOD0 and 2k maps; Low/Medium use LOD1 and 1k maps. Higher tiers also retain LOD1 for distance. Tree silhouettes are baked locally from the scanned model into 256×512 alpha render targets at load and rendered as instanced crossed cards beyond 140 m on Low / 240 m on higher tiers. This runtime bake does not download anything.
 
-Embedded palette PNGs are included inside each GLB as data URIs, so no external texture URLs or runtime network access remain. Models retain authored details; racing body colours are selectively tinted. Repeated scenery is instanced and static geometry is merged by material.
+Runtime models and images are decoded sequentially. Low/Medium do not decode height maps; High/Ultra load only the height maps actually used by terrain. Returning to Low/Medium releases cached High model buffers and 2k textures after the old scene is detached. Impostor caches are separate for each HDRI so dusk trees do not reuse daylight lighting.
 
-| Shipped file | Original pack / file | Shipped bytes | Triangles per model |
-| --- | --- | ---: | ---: |
-| `models/palm.glb` | `assets-src\pirate-kit\Models\GLB format\palm-detailed-bend.glb` | 65,424 | 482 |
-| `models/rock.glb` | `assets-src\pirate-kit\Models\GLB format\rocks-a.glb` | 41,052 | 264 |
-| `models/hut.glb` | `assets-src\pirate-kit\Models\GLB format\structure.glb` | 41,400 | 276 |
-| `models/pier.glb` | `assets-src\pirate-kit\Models\GLB format\structure-platform-dock.glb` | 46,752 | 324 |
-| `models/ship.glb` | `assets-src\watercraft-kit\Models\GLB format\ship-large.glb` | 167,516 | 1,849 |
-| `models/wreck.glb` | `assets-src\pirate-kit\Models\GLB format\ship-wreck.glb` | 236,904 | 2,282 |
-| `models/lighthouse.glb` | `assets-src\pirate-kit\Models\GLB format\tower-complete-large.glb` | 68,076 | 604 |
-| `models/station.glb` | `assets-src\city-kit-commercial\Models\GLB format\building-e.glb` | 142,876 | 1,509 |
-| `models/street.glb` | `assets-src\city-kit-commercial\Models\GLB format\detail-parasol-a.glb` | 24,988 | 96 |
-| `models/building0.glb` | `assets-src\city-kit-commercial\Models\GLB format\building-a.glb` | 123,604 | 1,252 |
-| `models/building1.glb` | `assets-src\city-kit-commercial\Models\GLB format\building-b.glb` | 121,076 | 1,276 |
-| `models/building2.glb` | `assets-src\city-kit-commercial\Models\GLB format\building-c.glb` | 117,456 | 1,195 |
-| `models/building3.glb` | `assets-src\city-kit-commercial\Models\GLB format\building-skyscraper-c.glb` | 164,188 | 1,704 |
+No palm model was present in the queried catalogue. Original curved, tapered palm trunks use the Poly Haven palm bark scan; bent alpha frond cards use the scanned fern foliage texture. No texture named ice or glacier was present: snow_04 is used as glossy blue-tinted compacted ice; rock_06 supplies glacier rock. The suitable downloaded moored ship is a historic Dutch sailing ship, not a modern motorboat. The full pine tree was rejected after its API listed a roughly 949 MB raw mesh; the smaller scanned pine sapling was selected. Its partially acquired unused texture cache is not shipped.
 
-## Poly Haven HDRIs and PBR textures
+## Poly Haven models (all CC0)
 
-All files are covered by [Poly Haven’s CC0 asset licence](https://polyhaven.com/license). HDRIs and texture sets were downloaded directly at 1k, avoiding larger unused resolutions. Each texture set contains diffuse, OpenGL normal and roughness maps.
+All are from [Poly Haven](https://polyhaven.com/license), licensed [CC0](https://creativecommons.org/publicdomain/zero/1.0/). `ph_<id>_lod0.glb` and `ph_<id>_lod1.glb` contain their textures. The modular pier is a selected pier section, not the whole staged kit.
 
-| Shipped file | Asset page | Exact source file | Download bytes |
-| --- | --- | --- | ---: |
-| `skies/tropic.hdr` | [kloofendal_48d_partly_cloudy_puresky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | [download](https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr) | 1,435,119 |
-| `skies/ice.hdr` | [qwantani_dusk_2_puresky](https://polyhaven.com/a/qwantani_dusk_2_puresky) | [download](https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/qwantani_dusk_2_puresky_1k.hdr) | 1,166,018 |
-| `skies/city.hdr` | [shanghai_bund](https://polyhaven.com/a/shanghai_bund) | [download](https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/shanghai_bund_1k.hdr) | 1,640,377 |
-| `textures/sand_diff.jpg` | [aerial_beach_01](https://polyhaven.com/a/aerial_beach_01) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg) | 115,382 |
-| `textures/sand_nor_gl.jpg` | [aerial_beach_01](https://polyhaven.com/a/aerial_beach_01) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_nor_gl_1k.jpg) | 262,878 |
-| `textures/sand_rough.jpg` | [aerial_beach_01](https://polyhaven.com/a/aerial_beach_01) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_rough_1k.jpg) | 155,774 |
-| `textures/rock_diff.jpg` | [rock_boulder_dry](https://polyhaven.com/a/rock_boulder_dry) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_diff_1k.jpg) | 859,211 |
-| `textures/rock_nor_gl.jpg` | [rock_boulder_dry](https://polyhaven.com/a/rock_boulder_dry) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_nor_gl_1k.jpg) | 802,497 |
-| `textures/rock_rough.jpg` | [rock_boulder_dry](https://polyhaven.com/a/rock_boulder_dry) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_boulder_dry/rock_boulder_dry_rough_1k.jpg) | 668,127 |
-| `textures/snow_diff.jpg` | [snow_02](https://polyhaven.com/a/snow_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_diff_1k.jpg) | 325,497 |
-| `textures/snow_nor_gl.jpg` | [snow_02](https://polyhaven.com/a/snow_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_nor_gl_1k.jpg) | 1,081,858 |
-| `textures/snow_rough.jpg` | [snow_02](https://polyhaven.com/a/snow_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_rough_1k.jpg) | 146,089 |
-| `textures/concrete_diff.jpg` | [concrete_floor_02](https://polyhaven.com/a/concrete_floor_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_diff_1k.jpg) | 776,097 |
-| `textures/concrete_nor_gl.jpg` | [concrete_floor_02](https://polyhaven.com/a/concrete_floor_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg) | 192,757 |
-| `textures/concrete_rough.jpg` | [concrete_floor_02](https://polyhaven.com/a/concrete_floor_02) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_rough_1k.jpg) | 318,550 |
-| `textures/metal_diff.jpg` | [metal_plate](https://polyhaven.com/a/metal_plate) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_diff_1k.jpg) | 692,234 |
-| `textures/metal_nor_gl.jpg` | [metal_plate](https://polyhaven.com/a/metal_plate) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_nor_gl_1k.jpg) | 770,307 |
-| `textures/metal_rough.jpg` | [metal_plate](https://polyhaven.com/a/metal_plate) | [download](https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/metal_plate/metal_plate_rough_1k.jpg) | 775,206 |
+| Source / shipped basename | LOD0 triangles | LOD1 triangles | Combined shipped bytes |
+| --- | ---: | ---: | ---: |
+| [island_tree_01](https://polyhaven.com/a/island_tree_01) / `ph_island_tree_01` | 12,625 | 2,501 | 5,418,372 |
+| [pine_sapling_small](https://polyhaven.com/a/pine_sapling_small) / `ph_pine_sapling_small` | 11,714 | 1,287 | 3,729,988 |
+| [dead_tree_trunk](https://polyhaven.com/a/dead_tree_trunk) / `ph_dead_tree_trunk` | 11,998 | 1,300 | 2,250,116 |
+| [fern_02](https://polyhaven.com/a/fern_02) / `ph_fern_02` | 5,996 | 647 | 873,452 |
+| [grass_medium_01](https://polyhaven.com/a/grass_medium_01) / `ph_grass_medium_01` | 6,150 | 642 | 3,040,304 |
+| [shrub_01](https://polyhaven.com/a/shrub_01) / `ph_shrub_01` | 5,979 | 650 | 1,398,856 |
+| [tree_stump_01](https://polyhaven.com/a/tree_stump_01) / `ph_tree_stump_01` | 12,000 | 1,299 | 3,082,964 |
+| [namaqualand_boulder_02](https://polyhaven.com/a/namaqualand_boulder_02) / `ph_namaqualand_boulder_02` | 6,000 | 649 | 2,889,644 |
+| [namaqualand_cliff_01](https://polyhaven.com/a/namaqualand_cliff_01) / `ph_namaqualand_cliff_01` | 6,000 | 649 | 2,012,156 |
+| [modular_wooden_pier](https://polyhaven.com/a/modular_wooden_pier) / `ph_modular_wooden_pier` | 1,645 | 434 | 5,311,992 |
+| [wooden_crate_01](https://polyhaven.com/a/wooden_crate_01) / `ph_wooden_crate_01` | 5,996 | 688 | 1,440,948 |
+| [Barrel_01](https://polyhaven.com/a/Barrel_01) / `ph_Barrel_01` | 2,682 | 649 | 1,689,024 |
+| [ocean_buoy](https://polyhaven.com/a/ocean_buoy) / `ph_ocean_buoy` | 6,000 | 1,846 | 2,452,280 |
+| [street_lamp_01](https://polyhaven.com/a/street_lamp_01) / `ph_street_lamp_01` | 12,117 | 1,316 | 1,083,432 |
+| [dutch_ship_medium](https://polyhaven.com/a/dutch_ship_medium) / `ph_dutch_ship_medium` | 14,516 | 1,600 | 7,142,144 |
 
-The initial `dikhololo_night` HDRI (1,745,132 bytes) was downloaded but replaced by the more suitable `qwantani_dusk_2_puresky`; it is not shipped. Poly Haven API requests returned HTTP 403; direct `dl.polyhaven.org` downloads succeeded. No water normal was found in the provider’s water texture search, so the permitted original procedural normal fallback is used. Quaternius was not needed and was not downloaded.
+## Poly Haven PBR textures (all CC0)
 
-## Effects and original supporting textures
+Each set has 1k `<label>_<channel>.jpg` and 2k `hi_<label>_<channel>.jpg`: diffuse (`diff`, sRGB), OpenGL normal (`nor_gl`), roughness (`rough`), ambient occlusion (`ao`) and height (`disp`, all linear). Terrain uses world-space/triplanar colour, height/slope transitions, normal mapping and macro modulation; High/Ultra add height-map parallax. The ice material is an explicitly documented snow-scan substitute.
 
-The Particle Pack supplies the following PNGs. The complete 15,001,764-byte archive transfer failed after 12,287,413 bytes and the host ignored HTTP Range. A fresh 832,962-byte ZIP prefix yielded 12 complete PNG entries, each decompressed as data and verified against its entry CRC. Only the following three ship; the other nine recovered PNGs stay in ignored assets-src. The archive licence entry was not reached; the bundled licence declaration records the CC0 licence displayed on the source page.
+| Runtime label | Source | Available channels |
+| --- | --- | --- |
+| `sand` | [aerial_beach_01](https://polyhaven.com/a/aerial_beach_01) | diff, nor_gl, rough, ao, disp |
+| `wet` | [damp_beach_sand](https://polyhaven.com/a/damp_beach_sand) | diff, nor_gl, rough, ao, disp |
+| `rock` | [rock_boulder_dry](https://polyhaven.com/a/rock_boulder_dry) | diff, nor_gl, rough, ao, disp |
+| `moss` | [mossy_rock](https://polyhaven.com/a/mossy_rock) | diff, nor_gl, rough, ao, disp |
+| `grass` | [forest_floor](https://polyhaven.com/a/forest_floor) | diff, nor_gl, rough, ao, disp |
+| `snow` | [snow_02](https://polyhaven.com/a/snow_02) | diff, nor_gl, rough, ao, disp |
+| `ice` | [snow_04](https://polyhaven.com/a/snow_04) | diff, nor_gl, rough, ao, disp |
+| `glacier` | [rock_06](https://polyhaven.com/a/rock_06) | diff, nor_gl, rough, ao, disp |
+| `asphalt` | [asphalt_02](https://polyhaven.com/a/asphalt_02) | diff, nor_gl, rough, ao, disp |
+| `concrete` | [concrete_floor_02](https://polyhaven.com/a/concrete_floor_02) | diff, nor_gl, rough, ao, disp |
+| `brick` | [brick_wall_001](https://polyhaven.com/a/brick_wall_001) | diff, nor_gl, rough, ao, disp |
+| `metal` | [corrugated_iron](https://polyhaven.com/a/corrugated_iron) | diff, nor_gl, rough, ao, disp |
+| `bark` | [palm_bark](https://polyhaven.com/a/palm_bark) | diff, nor_gl, rough, ao, disp |
 
-| Shipped file | Source ZIP entry | Downloaded PNG bytes |
-| --- | --- | ---: |
-| `sprites/spray.png` | `PNG (Transparent)/dirt_02.png` | 54,060 |
-| `sprites/foam.png` | `PNG (Transparent)/fire_01.png` | 99,891 |
-| `sprites/flame.png` | `PNG (Transparent)/flame_01.png` | 54,099 |
+## Existing HDRIs and supporting art
 
-`textures/water_normal.jpg` is an original seamless 512×512 normal map generated offline by `scripts/prepare-assets.py`. `textures/shore_tropic.png`, `shore_ice.png`, `shore_city.png` are original 512×512 signed shoreline-distance fields baked from this project’s courses by `scripts/bake-shores.mjs`. They replace per-fragment shoreline searches. Number decals and original race / shortcut / station signs remain small runtime text canvases, not terrain art.
+The existing 1k HDRIs are [Kloofendal partly cloudy](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), [Qwantani dusk](https://polyhaven.com/a/qwantani_dusk_2_puresky) and [Shanghai Bund](https://polyhaven.com/a/shanghai_bund), all Poly Haven CC0. Their brightest upper-hemisphere radiance determines sun bearing/colour; horizon radiance sets fog. Per-course exposure uses ACES tone mapping. All tiers receive HDRI reflections.
 
-## Preparation / offline build
+Existing `water_normal.jpg`, three shoreline distance fields, soft particle masks, foam/flame sprites and signage support the water and gameplay effects. Kenney sprites are from [Particle Pack](https://kenney.nl/assets/particle-pack), CC0; see `public/assets/licenses/particle-pack.txt`. Round 6 removed the shipped Kenney palm, rock, hut, pier, ship, wreck, castle/lighthouse tower, station, parasol/street and four building GLBs. Their raw source packs remain in the ignored acquisition cache only.
 
-The checked-in `public/assets/` files are sufficient: `npm run build` requires no asset downloads. Vite copies them into `dist/assets/`; electron-builder’s existing `files: ["dist/**/*", ...]` includes every shipped file.
+## Existing racing boats
 
-To reproduce acquisition and preparation (Python 3 with Pillow, Node, network required):
+These were retained without re-downloading or rebuilding their geometry. Paint-only materials receive saturated colour, clearcoat and HDRI reflections. Separate trim, engines and glazing retain their authored materials. Speedboat n°1 and n°2 are **CC BY-NC 4.0**; the game must not be sold while these boats are included. Software licensing does not override asset licences.
 
-```text
-python scripts/fetch-kenney.py
-python scripts/fetch-particles.py
-python scripts/fetch-polyhaven.py
-python scripts/prepare-assets.py
-node scripts/bake-shores.mjs
-npm run assets:audit
-npm run build
-```
+| Shipped file | Title / author | Licence / source | Triangles | Bytes |
+| --- | --- | --- | ---: | ---: |
+| `models/sf_speedboat1.glb` | Speedboat n°1 / Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/9c8400c0580b4deda9bd6ad2aa84e421) | 11,780 | 463,728 |
+| `models/sf_speedboat2.glb` | Speedboat n°2 / Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/66da3d79c45c41719c19fb80d0009bef) | 11,829 | 557,592 |
+| `models/sf_myspeedboat.glb` | My Speed Boat... / MeRockNRollin | [CC BY 4.0](https://sketchfab.com/3d-models/d10195be58b74ba98a047a97c31c446e) | 7,207 | 887,828 |
+| `models/sf_futuristic.glb` | Futuristic Speedboat / dylanheyes | [CC BY 4.0](https://sketchfab.com/3d-models/5a8f4d21472e4b2b8ec4d23f70cf8cbc) | 11,995 | 1,021,496 |
+| `models/sf_cyberpunk.glb` | Cyberpunk Speedboat / jungle_jim | [CC BY 4.0](https://sketchfab.com/3d-models/1455b50eb92442d18c462a56428fdbec) | 11,958 | 934,628 |
+| `models/sf_speedboat_vrpspu.glb` | Speedboat / vrpspu | [CC BY 4.0](https://sketchfab.com/3d-models/9916bd4433024202ab84e43426fc2139) | 12,114 | 4,645,416 |
 
-Archives are kept only in memory while extracting whitelisted data extensions into git-ignored `assets-src/<pack>/`. Only selected data files are copied into `public/assets/`. No download or execution of Electron or electron-builder was performed for this round.
+## Budgets and validation
 
-The round 5 audit reports the current shipped asset size. Total acquisition remained below 60 MB including interrupted and diagnostic transfers, below the 300 MB budget; final shipped assets remain well below 120 MB.
+Low scenery is capped at **120 draws / 200,000 triangles**, with 1k textures, full default render resolution, no dynamic shadows, no SSAO and no planar/SSR pass. Contact shadows are inexpensive instanced patches. Medium adds follow-camera shadows; High/Ultra add SSAO, a half-resolution colour/depth prepass for refraction and depth foam, and a 512-square planar reflection. Normal maps, HDRI water reflections and physics-synchronised waves remain on every tier. Higher scene ceilings in `scripts/audit-assets.mjs` are Medium 200 draws/500k triangles, High 300 draws/3M triangles, Ultra 400 draws/5M triangles; conservative high counts include both near and distance models.
 
-## Round 5 racing boats
+`npm run assets:audit` checks every tier texture limit, embedded dependencies, foliage alpha, eight-boat budgets, scenery limits and the 250 MiB shipped ceiling. It writes `artifacts/round6/asset-audit.json`. These are conservative whole-course geometry counts, **not frame-rate measurements**. `node scripts/check-environment.mjs` is a Chrome-only native 1426×827 Low benchmark for all three `?verify=1&track=N` all-AI races; `--high` selects the High test. It never launches Electron. See ROUND6-REPORT.md for actual verification and limitations.
 
-Six prepared Sketchfab models replace all Kenney racing hulls. They retain +Z bow orientation, 8-unit length and the authored waterline. Material primitives are batched once per model and shared between instances; only `paint` materials are cloned and recoloured. Other boats retain the artist's colours and use an identity strip. Old racing hardware and decals are removed. Kenney boat0?boat5 files are no longer shipped; the Watercraft ship remains scenery.
+| Low course | Whole-course scenery triangles | Scenery draws |
+| --- | ---: | ---: |
+| Sunspill Atoll | 130,639 | 78 |
+| Aurora Narrows | 77,691 | 43 |
+| Voltage Basin | 54,083 | 60 |
 
-Speedboat n°1 and n°2 by Jonathan Geoffroy are **CC BY-NC 4.0**: the game may be shared for free but must not be sold while they are included. The software licence does not override asset licences. All six were optimised and normalised outside this round; no downloads or preparation reruns were performed.
-
-| Shipped model | Title | Author | Licence / source | Shipped bytes | Triangles |
-| --- | --- | --- | --- | ---: | ---: |
-| `models/sf_speedboat1.glb` | Speedboat n°1 | Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/9c8400c0580b4deda9bd6ad2aa84e421) | 463,728 | 11,780 |
-| `models/sf_speedboat2.glb` | Speedboat n°2 | Jonathan Geoffroy | [CC BY-NC 4.0](https://sketchfab.com/3d-models/66da3d79c45c41719c19fb80d0009bef) | 557,592 | 11,829 |
-| `models/sf_myspeedboat.glb` | My Speed Boat... | MeRockNRollin | [CC BY 4.0](https://sketchfab.com/3d-models/d10195be58b74ba98a047a97c31c446e) | 887,828 | 7,207 |
-| `models/sf_futuristic.glb` | Futuristic Speedboat | dylanheyes | [CC BY 4.0](https://sketchfab.com/3d-models/5a8f4d21472e4b2b8ec4d23f70cf8cbc) | 1,021,496 | 11,995 |
-| `models/sf_cyberpunk.glb` | Cyberpunk Speedboat | jungle_jim | [CC BY 4.0](https://sketchfab.com/3d-models/1455b50eb92442d18c462a56428fdbec) | 934,628 | 11,958 |
-| `models/sf_speedboat_vrpspu.glb` | Speedboat | vrpspu | [CC BY 4.0](https://sketchfab.com/3d-models/9916bd4433024202ab84e43426fc2139) | 4,645,416 | 12,114 |
-
-On Low, transmission and clearcoat are disabled, reflections are reduced, and the cabin boat uses a single opaque pass for its shared palette variants. All model triangles remain. The audit caps eight boats including boost/identity accents at 100 draws and 100,000 triangles; its conservative whole-course allowance is now 350,000 triangles / 220 draws to include the detailed fleet. The worst eight-copy fleet is 97,024 triangles / 96 draws.
+Current shipped asset directory: 118.45 MiB (ceiling 250 MiB).

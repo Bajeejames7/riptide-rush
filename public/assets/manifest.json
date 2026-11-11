@@ -10,37 +10,773 @@
     "sf_speedboat_vrpspu",
     "sf_myspeedboat",
     "sf_cyberpunk",
-    "sf_futuristic",
-    "palm",
-    "rock",
-    "hut",
-    "pier",
-    "ship",
-    "wreck",
-    "lighthouse",
-    "station",
-    "street",
-    "building0",
-    "building1",
-    "building2",
-    "building3"
+    "sf_futuristic"
   ],
   "textures": [
+    "asphalt_ao",
+    "asphalt_diff",
+    "asphalt_disp",
+    "asphalt_nor_gl",
+    "asphalt_rough",
+    "bark_ao",
+    "bark_diff",
+    "bark_disp",
+    "bark_nor_gl",
+    "bark_rough",
+    "brick_ao",
+    "brick_diff",
+    "brick_disp",
+    "brick_nor_gl",
+    "brick_rough",
+    "concrete_ao",
     "concrete_diff",
+    "concrete_disp",
     "concrete_nor_gl",
     "concrete_rough",
+    "glacier_ao",
+    "glacier_diff",
+    "glacier_disp",
+    "glacier_nor_gl",
+    "glacier_rough",
+    "grass_ao",
+    "grass_diff",
+    "grass_disp",
+    "grass_nor_gl",
+    "grass_rough",
+    "ice_ao",
+    "ice_diff",
+    "ice_disp",
+    "ice_nor_gl",
+    "ice_rough",
+    "metal_ao",
     "metal_diff",
+    "metal_disp",
     "metal_nor_gl",
     "metal_rough",
+    "moss_ao",
+    "moss_diff",
+    "moss_disp",
+    "moss_nor_gl",
+    "moss_rough",
+    "rock_ao",
     "rock_diff",
+    "rock_disp",
     "rock_nor_gl",
     "rock_rough",
+    "sand_ao",
     "sand_diff",
+    "sand_disp",
     "sand_nor_gl",
     "sand_rough",
+    "snow_ao",
     "snow_diff",
+    "snow_disp",
     "snow_nor_gl",
     "snow_rough",
-    "water_normal"
+    "water_normal",
+    "wet_ao",
+    "wet_diff",
+    "wet_disp",
+    "wet_nor_gl",
+    "wet_rough"
+  ],
+  "environment": [
+    {
+      "name": "island_tree_01",
+      "id": "ph_island_tree_01_lod0",
+      "lod": 0,
+      "triangles": 12625,
+      "url": "https://polyhaven.com/a/island_tree_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -2.348482131958008,
+          0,
+          -2.3941705226898193
+        ],
+        "max": [
+          2.348482131958008,
+          4.98150235041976,
+          2.3941705226898193
+        ]
+      },
+      "bytes": 4190728
+    },
+    {
+      "name": "island_tree_01",
+      "id": "ph_island_tree_01_lod1",
+      "lod": 1,
+      "triangles": 2501,
+      "url": "https://polyhaven.com/a/island_tree_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -2.3150789737701416,
+          0,
+          -2.2851628065109253
+        ],
+        "max": [
+          2.3150789737701416,
+          4.892921265214682,
+          2.2851628065109253
+        ]
+      },
+      "bytes": 1227644
+    },
+    {
+      "name": "pine_sapling_small",
+      "id": "ph_pine_sapling_small_lod0",
+      "lod": 0,
+      "triangles": 11714,
+      "url": "https://polyhaven.com/a/pine_sapling_small",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.3129480481147766,
+          0,
+          -0.38448359072208405
+        ],
+        "max": [
+          1.31790030002594,
+          1.2989574084058404,
+          0.3831913024187088
+        ]
+      },
+      "bytes": 3299748
+    },
+    {
+      "name": "pine_sapling_small",
+      "id": "ph_pine_sapling_small_lod1",
+      "lod": 1,
+      "triangles": 1287,
+      "url": "https://polyhaven.com/a/pine_sapling_small",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.293756753206253,
+          0,
+          -0.3691531866788864
+        ],
+        "max": [
+          1.293756753206253,
+          1.141984909772873,
+          0.3691531866788864
+        ]
+      },
+      "bytes": 430240
+    },
+    {
+      "name": "dead_tree_trunk",
+      "id": "ph_dead_tree_trunk_lod0",
+      "lod": 0,
+      "triangles": 11998,
+      "url": "https://polyhaven.com/a/dead_tree_trunk",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.5255075097084045,
+          0.0006514377892017365,
+          -0.13876375555992126
+        ],
+        "max": [
+          1.5255075097084045,
+          0.29043155536055565,
+          0.13876375555992126
+        ]
+      },
+      "bytes": 1758588
+    },
+    {
+      "name": "dead_tree_trunk",
+      "id": "ph_dead_tree_trunk_lod1",
+      "lod": 1,
+      "triangles": 1300,
+      "url": "https://polyhaven.com/a/dead_tree_trunk",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.5212015509605408,
+          0.0028469357639551163,
+          -0.13866126537322998
+        ],
+        "max": [
+          1.5232831835746765,
+          0.28754832968115807,
+          0.13641665130853653
+        ]
+      },
+      "bytes": 491528
+    },
+    {
+      "name": "fern_02",
+      "id": "ph_fern_02_lod0",
+      "lod": 0,
+      "triangles": 5996,
+      "url": "https://polyhaven.com/a/fern_02",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.9862648844718933,
+          0,
+          -0.8620138019323349
+        ],
+        "max": [
+          0.9862648844718933,
+          0.4276947118341923,
+          0.8620138019323349
+        ]
+      },
+      "bytes": 672536
+    },
+    {
+      "name": "fern_02",
+      "id": "ph_fern_02_lod1",
+      "lod": 1,
+      "triangles": 647,
+      "url": "https://polyhaven.com/a/fern_02",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.9774985313415527,
+          0,
+          -0.855341300368309
+        ],
+        "max": [
+          0.9847684800624847,
+          0.42462441697716713,
+          0.8620138019323349
+        ]
+      },
+      "bytes": 200916
+    },
+    {
+      "name": "grass_medium_01",
+      "id": "ph_grass_medium_01_lod0",
+      "lod": 0,
+      "triangles": 6150,
+      "url": "https://polyhaven.com/a/grass_medium_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -2.8020996656268835,
+          0.000786827877163887,
+          -0.16327940672636032
+        ],
+        "max": [
+          2.802491744980216,
+          0.3425815124064684,
+          0.16327940672636032
+        ]
+      },
+      "bytes": 2300764
+    },
+    {
+      "name": "grass_medium_01",
+      "id": "ph_grass_medium_01_lod1",
+      "lod": 1,
+      "triangles": 642,
+      "url": "https://polyhaven.com/a/grass_medium_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -2.7725126203149557,
+          0.004647392779588699,
+          -0.13862217217683792
+        ],
+        "max": [
+          2.7794081158936024,
+          0.3425815124064684,
+          0.13829944282770157
+        ]
+      },
+      "bytes": 739540
+    },
+    {
+      "name": "shrub_01",
+      "id": "ph_shrub_01_lod0",
+      "lod": 0,
+      "triangles": 5979,
+      "url": "https://polyhaven.com/a/shrub_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.2929074838757515,
+          0,
+          -0.10907477885484695
+        ],
+        "max": [
+          1.2930957451462746,
+          0.3954953355714679,
+          0.10913700610399246
+        ]
+      },
+      "bytes": 1094516
+    },
+    {
+      "name": "shrub_01",
+      "id": "ph_shrub_01_lod1",
+      "lod": 1,
+      "triangles": 650,
+      "url": "https://polyhaven.com/a/shrub_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.2929074838757515,
+          0,
+          -0.10853637754917145
+        ],
+        "max": [
+          1.2930957451462746,
+          0.38004095386713743,
+          0.09648895263671875
+        ]
+      },
+      "bytes": 304340
+    },
+    {
+      "name": "tree_stump_01",
+      "id": "ph_tree_stump_01_lod0",
+      "lod": 0,
+      "triangles": 12000,
+      "url": "https://polyhaven.com/a/tree_stump_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.7127517461776733,
+          0.00016829371452331543,
+          -0.7949918210506439
+        ],
+        "max": [
+          0.7127752304077148,
+          0.5726675391197205,
+          0.7951571643352509
+        ]
+      },
+      "bytes": 2381772
+    },
+    {
+      "name": "tree_stump_01",
+      "id": "ph_tree_stump_01_lod1",
+      "lod": 1,
+      "triangles": 1299,
+      "url": "https://polyhaven.com/a/tree_stump_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.7127517461776733,
+          0.00016829371452331543,
+          -0.7934565246105194
+        ],
+        "max": [
+          0.7127752304077148,
+          0.5647701025009155,
+          0.7940352261066437
+        ]
+      },
+      "bytes": 701192
+    },
+    {
+      "name": "namaqualand_boulder_02",
+      "id": "ph_namaqualand_boulder_02_lod0",
+      "lod": 0,
+      "triangles": 6000,
+      "url": "https://polyhaven.com/a/namaqualand_boulder_02",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.2599936127662659,
+          0,
+          -0.6158098578453064
+        ],
+        "max": [
+          1.2660711407661438,
+          0.8803853243589401,
+          0.6133597493171692
+        ]
+      },
+      "bytes": 2275816
+    },
+    {
+      "name": "namaqualand_boulder_02",
+      "id": "ph_namaqualand_boulder_02_lod1",
+      "lod": 1,
+      "triangles": 649,
+      "url": "https://polyhaven.com/a/namaqualand_boulder_02",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.2548660635948181,
+          0.009183481335639954,
+          -0.6150137186050415
+        ],
+        "max": [
+          1.2569127678871155,
+          0.8654324263334274,
+          0.6128749847412109
+        ]
+      },
+      "bytes": 613828
+    },
+    {
+      "name": "namaqualand_cliff_01",
+      "id": "ph_namaqualand_cliff_01_lod0",
+      "lod": 0,
+      "triangles": 6000,
+      "url": "https://polyhaven.com/a/namaqualand_cliff_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -4.13788914680481,
+          0,
+          -2.195066809654236
+        ],
+        "max": [
+          4.133622884750366,
+          4.959461480379105,
+          2.187692701816559
+        ]
+      },
+      "bytes": 1598864
+    },
+    {
+      "name": "namaqualand_cliff_01",
+      "id": "ph_namaqualand_cliff_01_lod1",
+      "lod": 1,
+      "triangles": 649,
+      "url": "https://polyhaven.com/a/namaqualand_cliff_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -4.12545371055603,
+          0,
+          -2.195066809654236
+        ],
+        "max": [
+          4.139521837234497,
+          4.950542718172073,
+          2.178929626941681
+        ]
+      },
+      "bytes": 413292
+    },
+    {
+      "name": "modular_wooden_pier",
+      "id": "ph_modular_wooden_pier_lod0",
+      "lod": 0,
+      "triangles": 1645,
+      "url": "https://polyhaven.com/a/modular_wooden_pier",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.2447919845581055,
+          0.004582643508911133,
+          -1.7542680501937866
+        ],
+        "max": [
+          1.2396788597106934,
+          4.263413965702057,
+          1.7548035383224487
+        ]
+      },
+      "bytes": 4228316
+    },
+    {
+      "name": "modular_wooden_pier",
+      "id": "ph_modular_wooden_pier_lod1",
+      "lod": 1,
+      "triangles": 434,
+      "url": "https://polyhaven.com/a/modular_wooden_pier",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -1.221894383430481,
+          0,
+          -1.7480077743530273
+        ],
+        "max": [
+          1.221894383430481,
+          4.227226793766022,
+          1.7480077743530273
+        ]
+      },
+      "bytes": 1083676
+    },
+    {
+      "name": "wooden_crate_01",
+      "id": "ph_wooden_crate_01_lod0",
+      "lod": 0,
+      "triangles": 5996,
+      "url": "https://polyhaven.com/a/wooden_crate_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.4126364588737488,
+          0,
+          -0.20447687059640884
+        ],
+        "max": [
+          0.4126364588737488,
+          0.3496182831004262,
+          0.20447687059640884
+        ]
+      },
+      "bytes": 1135764
+    },
+    {
+      "name": "wooden_crate_01",
+      "id": "ph_wooden_crate_01_lod1",
+      "lod": 1,
+      "triangles": 688,
+      "url": "https://polyhaven.com/a/wooden_crate_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.41224801540374756,
+          0.001735425554215908,
+          -0.2010640725493431
+        ],
+        "max": [
+          0.40820562839508057,
+          0.34859633166342974,
+          0.20321928709745407
+        ]
+      },
+      "bytes": 305184
+    },
+    {
+      "name": "Barrel_01",
+      "id": "ph_Barrel_01_lod0",
+      "lod": 0,
+      "triangles": 2682,
+      "url": "https://polyhaven.com/a/Barrel_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.28151756525039673,
+          0,
+          -0.2815176099538803
+        ],
+        "max": [
+          0.28151756525039673,
+          0.8800000050105155,
+          0.2815176099538803
+        ]
+      },
+      "bytes": 1333964
+    },
+    {
+      "name": "Barrel_01",
+      "id": "ph_Barrel_01_lod1",
+      "lod": 1,
+      "triangles": 649,
+      "url": "https://polyhaven.com/a/Barrel_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.2813747227191925,
+          0,
+          -0.2813747376203537
+        ],
+        "max": [
+          0.2801676094532013,
+          0.8788771131075919,
+          0.2801676243543625
+        ]
+      },
+      "bytes": 355060
+    },
+    {
+      "name": "ocean_buoy",
+      "id": "ph_ocean_buoy_lod0",
+      "lod": 0,
+      "triangles": 6000,
+      "url": "https://polyhaven.com/a/ocean_buoy",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.5333051383495331,
+          0,
+          -0.4760739803314209
+        ],
+        "max": [
+          0.5325048267841339,
+          2.656234323978424,
+          0.4760739803314209
+        ]
+      },
+      "bytes": 1887108
+    },
+    {
+      "name": "ocean_buoy",
+      "id": "ph_ocean_buoy_lod1",
+      "lod": 1,
+      "triangles": 1846,
+      "url": "https://polyhaven.com/a/ocean_buoy",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.5224473178386688,
+          0,
+          -0.4679630547761917
+        ],
+        "max": [
+          0.5224473178386688,
+          2.650337517261505,
+          0.4679630547761917
+        ]
+      },
+      "bytes": 565172
+    },
+    {
+      "name": "street_lamp_01",
+      "id": "ph_street_lamp_01_lod0",
+      "lod": 0,
+      "triangles": 12117,
+      "url": "https://polyhaven.com/a/street_lamp_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.35216811299324036,
+          0,
+          -0.19324657320976257
+        ],
+        "max": [
+          0.351848304271698,
+          3.8705554008483887,
+          0.19324658811092377
+        ]
+      },
+      "bytes": 880888
+    },
+    {
+      "name": "street_lamp_01",
+      "id": "ph_street_lamp_01_lod1",
+      "lod": 1,
+      "triangles": 1316,
+      "url": "https://polyhaven.com/a/street_lamp_01",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -0.34459519386291504,
+          0,
+          -0.1925790160894394
+        ],
+        "max": [
+          0.351848304271698,
+          3.865750551223755,
+          0.191803440451622
+        ]
+      },
+      "bytes": 202544
+    },
+    {
+      "name": "dutch_ship_medium",
+      "id": "ph_dutch_ship_medium_lod0",
+      "lod": 0,
+      "triangles": 14516,
+      "url": "https://polyhaven.com/a/dutch_ship_medium",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -11.584293365478516,
+          0,
+          -3.242832660675049
+        ],
+        "max": [
+          11.584293365478516,
+          24.657122135162354,
+          3.242832660675049
+        ]
+      },
+      "bytes": 5323272
+    },
+    {
+      "name": "dutch_ship_medium",
+      "id": "ph_dutch_ship_medium_lod1",
+      "lod": 1,
+      "triangles": 1600,
+      "url": "https://polyhaven.com/a/dutch_ship_medium",
+      "license": "CC0",
+      "bounds": {
+        "min": [
+          -11.468311309814453,
+          0,
+          -3.154798984527588
+        ],
+        "max": [
+          11.468311309814453,
+          20.530584812164307,
+          3.154798984527588
+        ]
+      },
+      "bytes": 1818872
+    }
+  ],
+  "highTextures": [
+    "hi_asphalt_ao",
+    "hi_asphalt_diff",
+    "hi_asphalt_disp",
+    "hi_asphalt_nor_gl",
+    "hi_asphalt_rough",
+    "hi_bark_ao",
+    "hi_bark_diff",
+    "hi_bark_disp",
+    "hi_bark_nor_gl",
+    "hi_bark_rough",
+    "hi_brick_ao",
+    "hi_brick_diff",
+    "hi_brick_disp",
+    "hi_brick_nor_gl",
+    "hi_brick_rough",
+    "hi_concrete_ao",
+    "hi_concrete_diff",
+    "hi_concrete_disp",
+    "hi_concrete_nor_gl",
+    "hi_concrete_rough",
+    "hi_glacier_ao",
+    "hi_glacier_diff",
+    "hi_glacier_disp",
+    "hi_glacier_nor_gl",
+    "hi_glacier_rough",
+    "hi_grass_ao",
+    "hi_grass_diff",
+    "hi_grass_disp",
+    "hi_grass_nor_gl",
+    "hi_grass_rough",
+    "hi_ice_ao",
+    "hi_ice_diff",
+    "hi_ice_disp",
+    "hi_ice_nor_gl",
+    "hi_ice_rough",
+    "hi_metal_ao",
+    "hi_metal_diff",
+    "hi_metal_disp",
+    "hi_metal_nor_gl",
+    "hi_metal_rough",
+    "hi_moss_ao",
+    "hi_moss_diff",
+    "hi_moss_disp",
+    "hi_moss_nor_gl",
+    "hi_moss_rough",
+    "hi_rock_ao",
+    "hi_rock_diff",
+    "hi_rock_disp",
+    "hi_rock_nor_gl",
+    "hi_rock_rough",
+    "hi_sand_ao",
+    "hi_sand_diff",
+    "hi_sand_disp",
+    "hi_sand_nor_gl",
+    "hi_sand_rough",
+    "hi_snow_ao",
+    "hi_snow_diff",
+    "hi_snow_disp",
+    "hi_snow_nor_gl",
+    "hi_snow_rough",
+    "hi_wet_ao",
+    "hi_wet_diff",
+    "hi_wet_disp",
+    "hi_wet_nor_gl",
+    "hi_wet_rough"
   ]
 }

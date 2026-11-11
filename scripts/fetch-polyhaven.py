@@ -1,4 +1,6 @@
-import urllib.request,pathlib,json,concurrent.futures
+import urllib.request,pathlib,json,concurrent.futures,sys,runpy
+if '--environment' in sys.argv:
+ runpy.run_path('scripts/fetch-environment.py');runpy.run_path('scripts/fetch-foliage-alpha.py');sys.exit()
 jobs=[]
 for label,name in [('tropic','kloofendal_48d_partly_cloudy_puresky'),('ice','qwantani_dusk_2_puresky'),('city','shanghai_bund')]:jobs.append((f'skies/{label}.hdr',f'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/{name}_1k.hdr',name))
 for label,name in [('sand','aerial_beach_01'),('rock','rock_boulder_dry'),('snow','snow_02'),('concrete','concrete_floor_02'),('metal','metal_plate')]:

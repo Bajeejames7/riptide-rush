@@ -1,7 +1,8 @@
 import boatCredits from "../public/assets/models/sf_boats.json" with {type:"json"};
+import environmentCredits from "../public/assets/environment.json" with {type:"json"};
 import {EVENTS,TIERS,PAINTS,loadSlots,saveSlots,freshSave,totalStars,unlocked,canEnter,upgrade,createEvent,stepEvent,completeEvent} from './core/career.js';
 import "./style.css";
-import {preloadAssets} from './assets.js';
+import {preloadAssets,loadEnvironmentAssets,releaseEnvironmentTier} from './assets.js';
 import { Graphics } from "./render.js";
 import { Input, ACTIONS } from "./input.js";
 import { Audio } from "./audio.js";
@@ -79,7 +80,7 @@ try {
     settings.quality = 0;
     graphics.resize();
   }
-  await preloadAssets((fraction,name)=>{ui.innerHTML='<section class="panel"><div class="eyebrow">RIPTIDE RUSH</div><h2>Loading the waterfront</h2><progress max="1" value="'+fraction+'"></progress><p>'+Math.round(fraction*100)+'% / '+escapeHtml(name)+'</p></section>';});
+  await preloadAssets((fraction,name)=>{ui.innerHTML='<section class="panel"><div class="eyebrow">RIPTIDE RUSH</div><h2>Loading the waterfront</h2><progress max="1" value="'+fraction+'"></progress><p>'+Math.round(fraction*100)+'% / '+escapeHtml(name)+'</p></section>';},settings.quality);
   graphics.load(track);
 } catch (e) {
   ui.innerHTML =
@@ -466,7 +467,7 @@ function finish() {
 }
 function credits(back){
  screen="credits";
- const packs=[['Kenney','Watercraft Kit','https://kenney.nl/assets/watercraft-kit'],['Kenney','Pirate Kit','https://kenney.nl/assets/pirate-kit'],['Kenney','City Kit Commercial','https://kenney.nl/assets/city-kit-commercial'],['Kenney','Particle Pack','https://kenney.nl/assets/particle-pack'],...['kloofendal_48d_partly_cloudy_puresky','qwantani_dusk_2_puresky','shanghai_bund','aerial_beach_01','rock_boulder_dry','snow_02','concrete_floor_02','metal_plate'].map(id=>['Poly Haven',id,'https://polyhaven.com/a/'+id])];
+ const packs=[['Kenney','Particle Pack','https://kenney.nl/assets/particle-pack'],...[...new Set(['kloofendal_48d_partly_cloudy_puresky','qwantani_dusk_2_puresky','shanghai_bund',...environmentCredits.models.map(m=>m.name),...Object.values(environmentCredits.textures)])].map(id=>['Poly Haven',id,'https://polyhaven.com/a/'+id])];
  page("Credits",`<div class="card subtitle"><p>Speedboat n°1 and n°2 by Jonathan Geoffroy are CC BY-NC 4.0. The game may be shared for free but must not be sold while these boats are included.</p>${boatCredits.map(b=>`<p><b>${b.title}</b> - ${b.author} / ${b.license}<br><a href="${b.url}" target="_blank" rel="noopener noreferrer">${b.url}</a><br>Optimised and normalised for Riptide Rush; selectable paint where available.</p>`).join('')}${packs.map(([author,title,url])=>`<p><b>${title}</b> - ${author} / CC0<br><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></p>`).join('')}<p>Courses, gameplay, audio and supporting procedural textures: Riptide Rush.</p></div>${button("back","Back",false,true)}`);
  on("back",back);
 }
@@ -474,13 +475,16 @@ function options(back) {
   screen = "settings";
   page(
     "Tune your ride",
-    `<div class="card"><label>Unlock everything for party play<select id="party"><option value="0" ${!settings.partyPlay?"selected":""}>Off</option><option value="1" ${settings.partyPlay?"selected":""}>On</option></select></label><div class="row"><label>Graphics quality<select id="quality">${["Low", "Medium", "High", "Ultra"].map((q, i) => `<option value="${i}" ${settings.quality === i ? "selected" : ""}>${q}</option>`).join("")}</select></label><label>Resolution scale <span id="scaleValue">${Math.round(settings.scale * 100)}%</span><input id="scale" type="range" min="0.5" max="1.5" step="0.1" value="${settings.scale}"></label></div>${["master", "music", "sfx"].map((k) => `<label>${k === "sfx" ? "Effects & engines" : k[0].toUpperCase() + k.slice(1)}<input id="${k}" type="range" min="0" max="1" step="0.05" value="${settings[k]}"></label>`).join("")}<div class="row">${button("fullscreen", "Toggle Fullscreen")}${button("remap", "Remap Controls")}${button("credits", "Credits")}</div></div><div class="card muted">Best laps<br>${TRACKS.map((t, i) => `${t.name}: ${clock(records[i])}`).join("<br>")}</div>${button("back", "Back", false, true)}`,
+    `<div class="card"><p id="gpu-hint"></p><label>Unlock everything for party play<select id="party"><option value="0" ${!settings.partyPlay?"selected":""}>Off</option><option value="1" ${settings.partyPlay?"selected":""}>On</option></select></label><div class="row"><label>Graphics quality<select id="quality">${["Low", "Medium", "High", "Ultra"].map((q, i) => `<option value="${i}" ${settings.quality === i ? "selected" : ""}>${q}</option>`).join("")}</select></label><label>Resolution scale <span id="scaleValue">${Math.round(settings.scale * 100)}%</span><input id="scale" type="range" min="0.5" max="1.5" step="0.1" value="${settings.scale}"></label></div>${["master", "music", "sfx"].map((k) => `<label>${k === "sfx" ? "Effects & engines" : k[0].toUpperCase() + k.slice(1)}<input id="${k}" type="range" min="0" max="1" step="0.05" value="${settings[k]}"></label>`).join("")}<div class="row">${button("fullscreen", "Toggle Fullscreen")}${button("remap", "Remap Controls")}${button("credits", "Credits")}</div></div><div class="card muted">Best laps<br>${TRACKS.map((t, i) => `${t.name}: ${clock(records[i])}`).join("<br>")}</div>${button("back", "Back", false, true)}`,
   );
+  const gl=graphics.renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');
+  $('#gpu-hint').textContent='GPU: '+(ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'Unavailable')+' / '+(!ext||graphics.isWeakGpu()?'Low recommended at native resolution':'High recommended; Ultra for dedicated GPUs');
   $("#party").onchange=e=>{settings.partyPlay=!!+e.target.value;save();normalizeChoices();};
-  $("#quality").onchange = (e) => {
-    settings.quality = +e.target.value;
-    graphics.resize();
-    save();
+  $("#quality").onchange = async (e) => {
+    const control=e.target,next=+control.value;control.disabled=true;
+    try{await loadEnvironmentAssets(next);settings.quality=next;graphics.load(track);releaseEnvironmentTier(next);graphics.resize();save();}
+    catch(error){control.value=settings.quality;toast('Could not load this preset: '+error.message);}
+    finally{control.disabled=false;}
   };
   $("#scale").oninput = (e) => {
     settings.scale = +e.target.value;

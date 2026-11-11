@@ -43,7 +43,20 @@ uniform vec4 blockers[2];
 uniform float width;
 uniform vec4 shortcuts[2];
 varying vec3 world,norm;
+uniform sampler2D sceneColor,sceneDepth,planarMap;
+uniform mat4 reflectionMatrix;
+uniform vec2 screenSize;
+uniform float advancedWater,cameraNear,cameraFar;
+uniform vec3 fogColor;
+uniform float fogNear,fogFar;
 void main() {
+  float viewDistance=distance(cameraPosition,world);
+  if(viewDistance>=fogFar){
+    gl_FragColor=vec4(fogColor,1.);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    return;
+  }
   vec2 uv=world.xz;
   vec3 detail=texture2D(detailMap,uv*.023+vec2(time*.008,time*.013)).xyz*2.-1.;
   vec3 fine=texture2D(detailMap,mat2(.74,-.67,.67,.74)*uv*.037-vec2(time*.012,time*.006)).xyz*2.-1.;
@@ -57,11 +70,26 @@ void main() {
   vec3 reflected=reflect(-v,n);
   vec3 reflectedSky=mix(textureCube(environmentMap,reflected).rgb,skyColor*.3,.15);
   vec3 col=mix(transmitted,reflectedSky,fres*.85+.1);
+  float depthFoam=0.;
+  if(advancedWater>.5){
+    vec2 screenUV=gl_FragCoord.xy/screenSize;
+    float bottomZ=texture2D(sceneDepth,screenUV).r;
+    float bottomView=cameraNear*cameraFar/((cameraFar-cameraNear)*bottomZ-cameraFar);
+    float surfaceView=cameraNear*cameraFar/((cameraFar-cameraNear)*gl_FragCoord.z-cameraFar);
+    float thickness=max(0.,surfaceView-bottomView);
+    vec3 bottom=texture2D(sceneColor,clamp(screenUV+n.xz*.006*min(thickness,2.),vec2(.001),vec2(.999))).rgb;
+    vec3 absorption=exp(-vec3(.21,.085,.045)*thickness);
+    transmitted=mix(baseColor*.6,bottom,absorption);
+    vec4 reflectedUV=reflectionMatrix*vec4(world,1.);reflectedUV.xy+=n.xz*.025*reflectedUV.w;
+    vec3 scenery=texture2DProj(planarMap,reflectedUV).rgb;
+    col=mix(transmitted,mix(reflectedSky,scenery,.65),fres*.85+.1);
+    depthFoam=(1.-smoothstep(.05,1.5,thickness))*.65;
+  }
   float spec=pow(max(dot(reflect(-sunDir,n),v),0.0),180.0);
   col+=vec3(1.0,.85,.65)*spec*2.0;
   float noise=texture2D(foamMap,world.xz*.08+vec2(time*.012)).r;
   float edge=abs(shoreDistance);
-  float foam=exp(-edge*.45)*noise*.7;
+  float foam=(advancedWater>.5?depthFoam:exp(-edge*.45)*.7)*noise;
   for(int i=0;i<2;i++) {
     float edge=abs(distance(world.xz,blockers[i].xy)-blockers[i].z);
     foam+=exp(-edge*1.4)*(.6+.4*sin(time*3.0+world.x));
@@ -75,6 +103,7 @@ void main() {
     foam+=exp(-side*side*.6)*smoothstep(-15.,-3.,along)*(1.-smoothstep(-3.,0.,along))*wakes[i].w*(i<8?.45:.03);
   }
   col=mix(col,vec3(.95,.98,1.),clamp(foam*.7,0.0,.85));
+  col=mix(col,fogColor,smoothstep(fogNear,fogFar,viewDistance));
   gl_FragColor=vec4(col,1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

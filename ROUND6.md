@@ -64,3 +64,13 @@ while the game stays playable on the owner's Intel HD 520 at Low.
 - No Electron/electron-builder runs, no commits.
 - Finish with an honest summary: what was downloaded (and what was not available), what was rebuilt, what
   you verified, what you could not verify.
+
+## Also fix (seen on screen after round 5)
+- Spray is overdone: a wall of large white blobs hides the boats ahead. Make it finer and more
+  transparent (smaller soft particles, less additive brightness, faster fade), a narrow rooster tail and
+  a low wake instead of a cloud, and never obscure the player's own boat.
+- Painted boats look like flat pastel plastic (e.g. the pale green Twin Comet). Use saturated player
+  colours with glossy clearcoat and HDRI reflections; keep dark trim/engines/windows unpainted so the
+  shape reads.
+- The Kenney pirate ships, palms, castle towers and grey stone blocks on Sunspill Atoll are the main
+  reason the scene looks like a toy set: they must be gone from all three tracks after this round.

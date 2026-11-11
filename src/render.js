@@ -2,12 +2,15 @@ import {BOAT_MODEL_IDS,boatDimensions} from "./core/boat-models.js";
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as T from "three";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { addEnvironment } from "./scenery.js";
+import { addEnvironment,prepareImpostors } from "./environment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 import { nearest } from "./core/tracks.js";
+import {wave} from './core/physics.js';
 import { waterVertex, waterFragment } from "./water.js";
 import {assets,model,surface,mergeStatic,skyLighting} from './assets.js';
 const tmp = new T.Vector3();
@@ -45,7 +48,7 @@ export function buildBoat(type,color,number=type+1,quality=2) {
  const hull=boatSource(type,quality).clone(true);g.add(hull);
  const bounds=new T.Box3().setFromObject(hull),size=bounds.getSize(new T.Vector3());
  g.userData.dimensions={width:size.x,height:size.y,length:size.z,stern:bounds.min.z,bow:bounds.max.z};
- const paints=new Map();hull.traverse(o=>{if(!o.isMesh||o.material.name!=='paint')return;const original=o.material;if(!paints.has(original)){const paint=original.clone();paint.userData={...paint.userData,shared:false};paint.color.set(color);paint.metalness=.42;paint.roughness=quality===0?.32:.19;paint.envMapIntensity=quality===0?.45:1.4;paints.set(original,paint);}o.material=paints.get(original);});
+ const paints=new Map();hull.traverse(o=>{if(!o.isMesh||o.material.name!=='paint')return;const original=o.material;if(!paints.has(original)){const paint=new T.MeshPhysicalMaterial();T.MeshStandardMaterial.prototype.copy.call(paint,original);paint.defines.PHYSICAL='';paint.clearcoat=1;paint.clearcoatRoughness=.09;paint.map=null;paint.userData={...paint.userData,shared:false};paint.color.set(color);paint.metalness=.18;paint.roughness=.19;paint.envMapIntensity=1.25;paints.set(original,paint);}o.material=paints.get(original);});
  if(!paints.size){const accent=mesh(new T.BoxGeometry(size.x*.8,.09,.12),new T.MeshBasicMaterial({color,toneMapped:false}),g,0,Math.max(.25,bounds.max.y*.65),bounds.min.z+.25);accent.castShadow=false;}
  const flame=new T.Sprite(new T.SpriteMaterial({map:assets.textures.get('flame')??null,color:0x77ccff,blending:T.AdditiveBlending,transparent:true,depthWrite:false,toneMapped:false}));flame.position.set(0,.2,bounds.min.z-.35);flame.scale.set(size.x*.7,2,1);flame.name='flame';flame.visible=false;g.add(flame);
  return g;
@@ -86,19 +89,20 @@ export class Graphics {
       this.particleGeo,
       new T.PointsMaterial({
         map: assets.textures.get('spray'),
-        size: 1.8,
+        size: .38,
         vertexColors: true,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.24,
         depthWrite: false,
-        blending: T.AdditiveBlending,
-        toneMapped: false,
+        blending: T.NormalBlending,
+        toneMapped: true,
       }),
     );
     this.particleMesh.frustumCulled = false;
     this.composer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.scene, this.cameras[0]);
     this.composer.addPass(this.renderPass);
+    this.ao=new SSAOPass(this.scene,this.cameras[0],100,100);this.ao.kernelRadius=8;this.ao.minDistance=.001;this.ao.maxDistance=.08;this.composer.addPass(this.ao);
     this.bloom = new UnrealBloomPass(new T.Vector2(100, 100), 0.22, 0.35, 1.6);
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass({
@@ -185,7 +189,7 @@ export class Graphics {
     }
   }
   resize() {
-    const q = [0.65, 0.85, 1, 1.25][this.settings.quality ?? 2];
+    const q = [1, 1, 1, 1.25][this.settings.quality ?? 2];
     this.renderer.setPixelRatio(
       Math.min(2, devicePixelRatio) * this.settings.scale * q * (this.dyn ?? 1),
     );
@@ -194,6 +198,7 @@ export class Graphics {
     this.composer.setSize(this.settings.quality===0?1:innerWidth,this.settings.quality===0?1:innerHeight);
     this.renderer.shadowMap.enabled = this.settings.quality > 0;
     this.bloom.enabled=this.settings.quality>0;
+    this.ao.enabled=this.settings.quality>=2;
   }
   load(track) {
     palette=new Map();
@@ -201,6 +206,7 @@ export class Graphics {
     for (const child of [...this.scene.children]) {
       if (child !== this.particleMesh)
         child.traverse((o) => {
+          if(o.isLight)o.dispose?.();
           if(!o.geometry?.userData.shared)o.geometry?.dispose();
           for (const m of Array.isArray(o.material)
             ? o.material
@@ -232,7 +238,7 @@ export class Graphics {
     );
     sun.position.set(120, 220, -150);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(this.settings.quality<2?1024:2048,this.settings.quality<2?1024:2048);
     sun.shadow.camera.left = -330;
     sun.shadow.camera.right = 330;
     sun.shadow.camera.top = 330;
@@ -244,7 +250,8 @@ export class Graphics {
     const hdri=assets.skies.get(theme);this.scene.background=hdri;
     this.scene.backgroundIntensity=theme==='city'?.55:.85;
     const lighting=skyLighting(hdri);this.scene.fog=new T.Fog(lighting.horizon.multiplyScalar(this.scene.backgroundIntensity),330,1450);
-    this.renderer.toneMappingExposure=track.variant==='sunset'?.7:track.variant==='rain'?.65:.85;
+    this.renderer.toneMappingExposure=track.variant==='sunset'?.7:track.variant==='rain'?.65:({tropic:.85,ice:1.05,city:.9}[theme]);
+    sun.color.copy(lighting.sunColor);
     if(track.variant==='sunset'){sun.color.set(0xffa766);this.scene.backgroundIntensity=.6;this.scene.fog.color.set(0xcb997e);}
     if(track.variant==='fog'){this.scene.fog.near=80;this.scene.fog.far=550;this.scene.backgroundIntensity=.55;}
     if(track.variant==='rain'){this.scene.fog.near=100;this.scene.fog.far=650;sun.intensity*=.5;}
@@ -254,6 +261,8 @@ export class Graphics {
     this.environments??=new Map();if(!this.environments.has(theme)){const pmrem=new T.PMREMGenerator(this.renderer);this.environments.set(theme,pmrem.fromEquirectangular(hdri));pmrem.dispose();}this.environment=this.environments.get(theme);this.scene.environment=this.environment.texture;
     if(!this.sprayMask){const c=document.createElement('canvas');c.width=c.height=64;const ctx=c.getContext('2d'),gradient=ctx.createRadialGradient(32,32,0,32,32,32);gradient.addColorStop(0,'rgba(255,255,255,1)');gradient.addColorStop(.3,'rgba(255,255,255,.8)');gradient.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64);this.sprayMask=new T.CanvasTexture(c);this.sprayMask.userData.shared=true;}this.particleMesh.material.map=this.sprayMask;this.particleMesh.material.needsUpdate=true;
     this.waterUniforms = {
+      fogColor:{value:this.scene.fog.color},fogNear:{value:this.scene.fog.near},fogFar:{value:this.scene.fog.far},
+      sceneColor:{value:null},sceneDepth:{value:null},planarMap:{value:null},reflectionMatrix:{value:new T.Matrix4()},screenSize:{value:new T.Vector2(1,1)},cameraNear:{value:.5},cameraFar:{value:2200},advancedWater:{value:this.settings.quality>=2?1:0},
       time: { value: 0 },
       shoreMap:{value:assets.textures.get('shore_'+theme)},
       detailMap:{value:assets.textures.get('water_normal')},foamMap:{value:assets.textures.get('foam')},
@@ -280,7 +289,7 @@ export class Graphics {
     const waterMat = new T.ShaderMaterial({
       uniforms: this.waterUniforms,
       vertexShader: waterVertex,
-      fragmentShader: '#define WAKE_COUNT '+(this.settings.quality===0?24:64)+'\n'+waterFragment,
+      fragmentShader: '#define WAKE_COUNT '+([12,24,64,64][this.settings.quality])+'\n'+waterFragment,
     });
     const waterGeo = new T.PlaneGeometry(
       2600,
@@ -291,13 +300,23 @@ export class Graphics {
     waterGeo.rotateX(-Math.PI / 2);
     this.water = mesh(waterGeo, waterMat, this.scene);
     this.water.castShadow = false;
+    this.shallowTarget?.dispose();this.planar?.getRenderTarget().dispose();this.planar?.geometry.dispose();this.planar?.material.dispose();
+    if(this.settings.quality>=2){
+      this.shallowTarget=new T.WebGLRenderTarget(512,512,{type:T.HalfFloatType});this.shallowTarget.depthTexture=new T.DepthTexture(512,512);
+      this.planar=new Reflector(new T.PlaneGeometry(2600,2600),{textureWidth:512,textureHeight:512,clipBias:.02});this.planar.rotation.x=-Math.PI/2;this.planar.updateMatrixWorld();
+      this.waterUniforms.sceneColor.value=this.shallowTarget.texture;this.waterUniforms.sceneDepth.value=this.shallowTarget.depthTexture;this.waterUniforms.planarMap.value=this.planar.getRenderTarget().texture;
+      this.waterUniforms.reflectionMatrix.value=this.planar.material.uniforms.textureMatrix.value;
+    }else{this.shallowTarget=null;this.planar=null;}
     const rock = surface(theme==='ice'?'snow':'rock'),
       neon = new T.MeshStandardMaterial({
         color: 0x37e5ed,
         emissive: 0x1b9ec0,
         emissiveIntensity: 3,
       });
-    addEnvironment(this.scene,track);
+    prepareImpostors(this.renderer,this.scene.environment,this.settings.quality,theme);
+    addEnvironment(this.scene,track,this.settings.quality);
+    this.boatContacts=null;
+    if(this.settings.quality===0){const geo=new T.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);this.boatContacts=new T.InstancedMesh(geo,new T.MeshBasicMaterial({map:this.sprayMask,color:0x061014,transparent:true,opacity:.28,depthWrite:false}),8);this.boatContacts.userData.keep=true;this.boatContacts.count=0;this.boatContacts.renderOrder=1;this.scene.add(this.boatContacts);}
     track.ramps.forEach((r) => {
       const group = new T.Group();
       group.position.set(r.x, r.height/2, r.z);
@@ -320,14 +339,8 @@ export class Graphics {
         box(group, whiteMaterial(), 0, 0.6, i * 2, 6, 0.08, 0.25);
     });
     for (const o of track.obstacles) {
-      mesh(
-        new T.IcosahedronGeometry(o.radius, 1),
-        rock,
-        this.scene,
-        o.x,
-        1,
-        o.z,
-      );
+      const name=`ph_namaqualand_boulder_02_lod${this.settings.quality<2?1:0}`,scanned=model(name),bounds=new T.Box3().setFromObject(scanned),size=bounds.getSize(new T.Vector3());
+      scanned.scale.setScalar(o.radius*2/Math.max(size.x,size.z));scanned.position.set(o.x,-.5,o.z);scanned.rotation.y=o.x*.07;scanned.userData.keep=true;scanned.traverse(p=>{if(p.isMesh)p.castShadow=p.receiveShadow=true;});this.scene.add(scanned);
     }
     track.shortcuts.forEach(({ a, b }) => {
       for (const p of [a, b]) {
@@ -427,15 +440,15 @@ export class Graphics {
   spray(b, count = 2, landing = false) {
     for (let j = 0; j < count && this.particles.length < 1500; j++) {
       const dimensions=this.boatModels.get(b.id)?.userData.dimensions??boatDimensions(b.type),stern=dimensions.stern??-dimensions.length/2;
-      const s = (Math.random() - 0.5) * dimensions.width;
+      const s = (Math.random() - 0.5) * dimensions.width*.32;
       this.particles.push({
         x: b.x + Math.sin(b.heading) * stern + Math.cos(b.heading)*s,
         z: b.z + Math.cos(b.heading) * stern - Math.sin(b.heading)*s,
         y: b.y,
         vx: -b.vx * 0.13 + s * 4,
         vz: -b.vz * 0.13 + (Math.random() - 0.5) * 6,
-        vy: landing ? 6 + Math.random() * 7 : 2 + Math.random() * Math.abs(b.speed)*.22,
-        life: 0.4 + Math.random() * 0.5,
+        vy: landing ? 1 + Math.random() * 2 : .6 + Math.random() * Math.abs(b.speed)*.025,
+        life: 0.16 + Math.random() * 0.18,
         color: new T.Color(0xffffff),
       });
     }
@@ -443,6 +456,7 @@ export class Graphics {
   update(boats, time, dt) {
     if(!this.waterUniforms)return;
     this.waterUniforms.time.value = time;
+    if(this.boatContacts){const d=new T.Object3D();this.boatContacts.count=Math.min(8,boats.length);boats.slice(0,8).forEach((b,i)=>{const dimensions=boatDimensions(b.type),water=wave(b.x,b.z,time).height;d.position.set(b.x,water+.06,b.z);d.rotation.y=b.heading;const strength=b.eliminated?0:Math.max(0,1-Math.max(0,b.y-water-.75)*.25);d.scale.set(dimensions.width*1.1*strength,1,dimensions.length*1.1*strength);d.updateMatrix();this.boatContacts.setMatrixAt(i,d.matrix);});this.boatContacts.instanceMatrix.needsUpdate=true;this.boatContacts.computeBoundingSphere();}
     this.wakeClock+=dt;
     if(this.wakeClock>.15){this.wakeClock=0;for(const b of boats)if(Math.abs(b.speed)>8)this.wakeHistory.unshift({x:b.x-Math.sin(b.heading)*boatDimensions(b.type).length/2,z:b.z-Math.cos(b.heading)*boatDimensions(b.type).length/2,heading:b.heading,life:1});}
     this.wakeHistory=this.wakeHistory.filter(p=>(p.life-=dt*.18)>0).slice(0,56);
@@ -469,17 +483,17 @@ export class Graphics {
           Math.min(1, Math.abs(b.speed) / 25),
         );
       if (Math.abs(b.speed) > 8 && Math.random() < 0.8)
-        this.spray(b, b.boosting ? 5 : 2);
+        this.spray(b, b.boosting ? 2 : 1);
       if ((b.landSerial||0)!==(model.userData.landSerial||0)) {
         model.userData.landSerial=b.landSerial;
-        this.spray(b, 55, true);this.shake=.7;
+        this.spray(b, 16, true);this.shake=.7;
         const ring=mesh(new T.PlaneGeometry(4,4),new T.MeshBasicMaterial({map:this.sprayMask,blending:T.AdditiveBlending,toneMapped:false,color:0xffffff,transparent:true,opacity:.7,side:T.DoubleSide,depthWrite:false}),this.scene,b.x,.9,b.z);
         ring.rotation.x=-Math.PI/2;this.splashes.push({mesh:ring,life:1});
       }
       if(b.local&&b.boosting)this.shake=Math.max(this.shake,.12);
-      if(Math.abs(b.speed)>20 && Math.random()<.6) {
+      if(!b.local && Math.abs(b.speed)>20 && Math.random()<.2) {
         const side=Math.random()<.5?-1:1, bow=model.userData.dimensions.bow*.8, width=model.userData.dimensions.width*.45;
-        this.particles.push({x:b.x+Math.sin(b.heading)*bow+Math.cos(b.heading)*side*width,z:b.z+Math.cos(b.heading)*bow-Math.sin(b.heading)*side*width,y:b.y,vx:b.vx*.3+Math.cos(b.heading)*side*(b.drifting?12:5),vz:b.vz*.3-Math.sin(b.heading)*side*5,vy:2+Math.random()*3,life:.6,color:new T.Color(0xffffff)});
+        this.particles.push({x:b.x+Math.sin(b.heading)*bow+Math.cos(b.heading)*side*width,z:b.z+Math.cos(b.heading)*bow-Math.sin(b.heading)*side*width,y:b.y,vx:b.vx*.3+Math.cos(b.heading)*side*(b.drifting?12:5),vz:b.vz*.3-Math.sin(b.heading)*side*5,vy:.5+Math.random(),life:.22,color:new T.Color(0xffffff)});
       }
     });
     for (const [id, model] of this.boatModels)
@@ -508,7 +522,7 @@ export class Graphics {
     for(const {batch,indices,part} of this.pickupBatches){indices.forEach((index,j)=>{const group=this.pickupModels[index];group.scale.setScalar(group.visible?1:0);group.updateMatrixWorld(true);batch.setMatrixAt(j,group.children[part].matrixWorld);});batch.instanceMatrix.needsUpdate=true;batch.computeBoundingSphere();}
     this.shake=Math.max(0,this.shake-dt*1.8);
     this.splashes=this.splashes.filter(s=>{s.life-=dt;const scale=1+(1-s.life)*13;s.mesh.scale.setScalar(scale);s.mesh.material.opacity=s.life*.6;if(s.life<=0){this.scene.remove(s.mesh);s.mesh.geometry.dispose();s.mesh.material.dispose();return false;}return true;});
-    this.particles = this.particles.filter((p) => p.life > 0);
+    this.particles = this.particles.filter((p) => p.life > 0 && !boats.some(b=>b.local&&Math.hypot(p.x-b.x,p.z-b.z)<boatDimensions(b.type).length*.8));
     this.particles.forEach((p, i) => {
       p.life -= dt;
       p.x += p.vx * dt;
@@ -584,15 +598,25 @@ export class Graphics {
         this.sun.target.position.set(b.x,0,b.z);this.sun.position.copy(this.sunOffset).add(new T.Vector3(b.x,0,b.z));
         Object.assign(this.sun.shadow.camera,{left:-65,right:65,top:65,bottom:-65});this.sun.shadow.camera.updateProjectionMatrix();
       }
+      this.scene.traverse(o=>{if(o.userData.sceneryCenter){const distance=c.position.distanceTo(o.userData.sceneryCenter);o.visible=distance<o.userData.sceneryDistance;for(const lod of [...(o.userData.objectLods??[]),...(o.userData.treeLods?[o.userData.treeLods]:[])]){lod.near.visible=distance<lod.distance;lod.far.visible=!lod.near.visible;}}});
       if(this.settings.quality===0){r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);r.render(this.scene,c);const stats={calls:r.info.render.calls,triangles:r.info.render.triangles};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);continue;}
       r.setScissorTest(false);
       if(this.postWidth!==w||this.postHeight!==h){this.composer.setSize(w,h);this.postWidth=w;this.postHeight=h;}
       this.vignette.uniforms.boost.value=b?.boosting?1:0;this.vignette.uniforms.time.value=time;
       this.renderPass.camera=c;
+      this.ao.camera=c;
+      r.info.reset();r.info.autoReset=false;
+      if(this.shallowTarget){
+        const size=new T.Vector2();r.getDrawingBufferSize(size);const ratio=.5;this.shallowTarget.setSize(Math.max(1,Math.floor(w*r.getPixelRatio()*ratio)),Math.max(1,Math.floor(h*r.getPixelRatio()*ratio)));
+        this.water.visible=false;r.setRenderTarget(this.shallowTarget);r.clear();r.render(this.scene,c);r.setRenderTarget(null);
+        this.planar.onBeforeRender(r,this.scene,c);this.water.visible=true;this.waterUniforms.screenSize.value.set(w*r.getPixelRatio(),h*r.getPixelRatio());
+      }
       this.composer.render();
+      const stats={calls:r.info.render.calls,triangles:r.info.render.triangles};this.frameStats.views.push(stats);this.frameStats.maxCalls=Math.max(this.frameStats.maxCalls,stats.calls);this.frameStats.maxTriangles=Math.max(this.frameStats.maxTriangles,stats.triangles);
       r.setRenderTarget(null);r.setViewport(x,y,w,h);r.setScissor(x,y,w,h);r.setScissorTest(true);
       this.blitMaterial.uniforms.tDiffuse.value=this.composer.readBuffer.texture;
       r.autoClear=false;r.render(this.blitScene,this.blitCamera);r.autoClear=true;
+      r.info.autoReset=true;
     }
     r.setScissorTest(false);
   }
