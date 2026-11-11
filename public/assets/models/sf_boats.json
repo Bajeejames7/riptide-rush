@@ -1,0 +1,406 @@
+[
+ {
+  "id": "speedboat1",
+  "file": "models/sf_speedboat1.glb",
+  "title": "Speedboat nÂ°1",
+  "author": "Jonathan Geoffroy",
+  "license": "CC BY-NC 4.0",
+  "url": "https://sketchfab.com/3d-models/9c8400c0580b4deda9bd6ad2aa84e421",
+  "triangles": 11780,
+  "trianglesOriginal": 65083,
+  "bytes": 463728,
+  "size": [
+   2.61,
+   1.29,
+   8
+  ],
+  "drawCalls": 5,
+  "materials": [
+   {
+    "name": "PaletteMaterial004",
+    "share": 0.835,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial003",
+    "share": 0.154,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial001",
+    "share": 0.009,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "phong12",
+    "share": 0.001,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial002",
+    "share": 0,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "speedboat2",
+  "file": "models/sf_speedboat2.glb",
+  "title": "Speedboat nÂ°2",
+  "author": "Jonathan Geoffroy",
+  "license": "CC BY-NC 4.0",
+  "url": "https://sketchfab.com/3d-models/66da3d79c45c41719c19fb80d0009bef",
+  "triangles": 11829,
+  "trianglesOriginal": 95598,
+  "bytes": 557592,
+  "size": [
+   2.14,
+   1.47,
+   8
+  ],
+  "drawCalls": 6,
+  "materials": [
+   {
+    "name": "PaletteMaterial002",
+    "share": 0.632,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial004",
+    "share": 0.363,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial001",
+    "share": 0.003,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial003",
+    "share": 0.001,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "phong10",
+    "share": 0,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "phong11",
+    "share": 0,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "myspeedboat",
+  "file": "models/sf_myspeedboat.glb",
+  "title": "My Speed Boat...",
+  "author": "MeRockNRollin",
+  "license": "CC BY 4.0",
+  "url": "https://sketchfab.com/3d-models/d10195be58b74ba98a047a97c31c446e",
+  "triangles": 7207,
+  "trianglesOriginal": 64183,
+  "bytes": 887828,
+  "size": [
+   2.32,
+   1.76,
+   8
+  ],
+  "drawCalls": 7,
+  "materials": [
+   {
+    "name": "paint",
+    "share": 0.663,
+    "textured": false,
+    "color": [
+     0.02,
+     0,
+     0
+    ]
+   },
+   {
+    "name": "Seats",
+    "share": 0.087,
+    "textured": true,
+    "color": [
+     0.28,
+     0.28,
+     0.28
+    ]
+   },
+   {
+    "name": "PaletteMaterial003",
+    "share": 0.078,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "BoatFloor",
+    "share": 0.071,
+    "textured": true,
+    "color": [
+     0.27,
+     0.27,
+     0.27
+    ]
+   },
+   {
+    "name": "PaletteMaterial001",
+    "share": 0.07,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial002",
+    "share": 0.026,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material.015",
+    "share": 0.004,
+    "textured": true,
+    "color": [
+     0.39,
+     0.39,
+     0.39
+    ]
+   }
+  ]
+ },
+ {
+  "id": "futuristic",
+  "file": "models/sf_futuristic.glb",
+  "title": "Futuristic Speedboat",
+  "author": "dylanheyes",
+  "license": "CC BY 4.0",
+  "url": "https://sketchfab.com/3d-models/5a8f4d21472e4b2b8ec4d23f70cf8cbc",
+  "triangles": 11995,
+  "trianglesOriginal": 162766,
+  "bytes": 1021496,
+  "size": [
+   2.18,
+   2.05,
+   8
+  ],
+  "drawCalls": 2,
+  "materials": [
+   {
+    "name": "paint",
+    "share": 0.95,
+    "textured": false,
+    "color": [
+     0.91,
+     0.92,
+     0.92
+    ]
+   },
+   {
+    "name": "Windows",
+    "share": 0.05,
+    "textured": false,
+    "color": [
+     0.05,
+     0.19,
+     0.31
+    ]
+   }
+  ]
+ },
+ {
+  "id": "cyberpunk",
+  "file": "models/sf_cyberpunk.glb",
+  "title": "Cyberpunk Speedboat",
+  "author": "jungle_jim",
+  "license": "CC BY 4.0",
+  "url": "https://sketchfab.com/3d-models/1455b50eb92442d18c462a56428fdbec",
+  "triangles": 11958,
+  "trianglesOriginal": 165816,
+  "bytes": 934628,
+  "size": [
+   3.75,
+   2.24,
+   8
+  ],
+  "drawCalls": 1,
+  "materials": [
+   {
+    "name": "paint",
+    "share": 1,
+    "textured": false,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   }
+  ]
+ },
+ {
+  "id": "speedboat_vrpspu",
+  "file": "models/sf_speedboat_vrpspu.glb",
+  "title": "Speedboat",
+  "author": "vrpspu",
+  "license": "CC BY 4.0",
+  "url": "https://sketchfab.com/3d-models/9916bd4433024202ab84e43426fc2139",
+  "triangles": 12114,
+  "trianglesOriginal": 84368,
+  "bytes": 4645416,
+  "size": [
+   2.45,
+   3.43,
+   8
+  ],
+  "drawCalls": 12,
+  "materials": [
+   {
+    "name": "Material_3",
+    "share": 0.59,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material_4",
+    "share": 0.294,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material_6",
+    "share": 0.055,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material_7",
+    "share": 0.037,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial001",
+    "share": 0.008,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material_12",
+    "share": 0.007,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "Material_31",
+    "share": 0.004,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   },
+   {
+    "name": "PaletteMaterial003",
+    "share": 0.002,
+    "textured": true,
+    "color": [
+     1,
+     1,
+     1
+    ]
+   }
+  ]
+ }
+]
